@@ -10,7 +10,12 @@
     "api:dev": "npm --workspace apps/api run dev",
     "api:build": "npm --workspace apps/api run build",
     "api:start": "npm --workspace apps/api run start",
-    "api:migrate": "npm --workspace apps/api run db:migrate"
+    "api:migrate": "npm --workspace apps/api run db:migrate",
+    "stack:up": "docker compose up --build",
+    "stack:up:mysql": "docker compose -f docker-compose.yml -f docker-compose.mysql.yml up --build",
+    "stack:down": "docker compose down -v",
+    "stack:logs": "docker compose logs -f api",
+    "codex:run": "npm run stack:up",
+    "codex:run:mysql": "npm run stack:up:mysql"
   }
 }
-

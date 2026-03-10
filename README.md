@@ -1,52 +1,86 @@
-# WeAreFamily - 家庭保单 AI 可视化管家
+﻿# WeAreFamily - Family Policy AI Steward
 
-## 项目目标
-- 前端：Flutter 跨端（移动端 + Web/桌面端）
-- 后端：Node.js + PostgreSQL/MySQL（二选一）
-- 用户类型：B 端保险经纪人 + C 端普通家庭用户
-- 交付模式：SaaS + Docker 私有化部署（面向 B 端售卖）
+## Goals
+- Frontend: Flutter (mobile + web/desktop)
+- Backend: Node.js + PostgreSQL/MySQL (either)
+- Users: Broker (B-side) + Consumer family (C-side)
+- Delivery: SaaS + Docker private deployment for brokers
 
-## 仓库结构
+## Repo Structure
 ```text
 apps/
   api/          # Node.js + Fastify + Knex
-  flutter_app/  # Flutter 前端骨架（B/C 角色入口）
+  flutter_app/  # Flutter app
 docker-compose.yml
 docker-compose.mysql.yml
 ```
 
-## 快速启动（后端 + PostgreSQL）
-1. 安装依赖：
+## Quick Start (PostgreSQL)
+1. Install dependencies:
    ```bash
    npm install
    ```
-2. 启动容器：
+2. Start stack:
    ```bash
-   docker compose up --build
+   npm run codex:run
    ```
-3. 健康检查：
+3. Health check:
    - `GET http://localhost:3000/health`
 
-## 启动 MySQL 方案
+## Quick Start (MySQL)
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.mysql.yml up --build
+npm run codex:run:mysql
 ```
 
-## API 角色与租户
-- 通过请求头传入：
-  - `x-user-id`
-  - `x-user-role`: `broker | consumer | admin`
-  - `x-tenant-id`
-- `TENANT_MODE`:
-  - `saas`：多租户
-  - `private`：私有化单租户
+## Codex Commands
+- Start stack (PostgreSQL): `npm run codex:run`
+- Start stack (MySQL): `npm run codex:run:mysql`
+- Stop stack: `npm run stack:down`
+- API logs: `npm run stack:logs`
 
-## Flutter 说明
-- 当前仓库提供 Flutter 业务源码骨架（`apps/flutter_app/lib`）。
-- 若本机尚未安装 Flutter，请先安装后执行：
+## Demo Accounts
+- Email: `broker@example.com`
+- Email: `consumer@example.com`
+- Password: `demo1234`
+
+## Authentication and Tenancy
+- `AUTH_REQUIRED=true` requires `Authorization: Bearer <token>`
+- Public endpoints:
+  - `/health`
+  - `/api/v1/auth/login`
+  - `/api/v1/auth/sso/callback`
+- `TENANT_MODE=saas` expects `tenantId` during login/SSO
+- `TENANT_MODE=private` forces `DEFAULT_TENANT_ID`
+
+## Family and PDF APIs
+- List families:
+  - `GET /api/v1/families`
+- List members:
+  - `GET /api/v1/families/:familyId/members`
+- Add member:
+  - `POST /api/v1/families/:familyId/members`
+- List documents:
+  - `GET /api/v1/families/:familyId/documents`
+- Upload policy PDF form:
+  - `POST /api/v1/families/:familyId/documents` (multipart `file`)
+- Download document:
+  - `GET /api/v1/families/:familyId/documents/:documentId/download`
+
+## Flutter
+- Run app:
   ```bash
   cd apps/flutter_app
   flutter pub get
-  flutter run -d chrome
+  flutter run -d edge --dart-define=API_BASE_URL=http://localhost:3000
   ```
+- UI now includes:
+  - Dashboard
+  - Policies
+  - Family Center (members + PDF import)
 
+  
+4. 登录
+用演示账号：
+
+broker@example.com / consumer@example.com
+密码： demo1234

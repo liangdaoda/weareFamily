@@ -1,0 +1,51 @@
+version: '3.9'
+
+# Default stack: API + PostgreSQL.
+services:
+  api:
+    # Node API container.
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DB_CLIENT: postgres
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/wearefamily
+      TENANT_MODE: saas
+      DEFAULT_TENANT_ID: tenant-demo
+      AUTO_MIGRATE: 'true'
+      AUTH_REQUIRED: 'true'
+      JWT_SECRET: 'change-me-in-production'
+      JWT_ISSUER: 'wearefamily-api'
+      JWT_EXPIRES_IN: '12h'
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads-data:/app/uploads
+
+  postgres:
+    # PostgreSQL database container.
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wearefamily
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d wearefamily']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  uploads-data:
