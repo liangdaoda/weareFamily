@@ -1,0 +1,16 @@
+{
+  "name": "wearefamily",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Family policy AI visual steward monorepo",
+  "workspaces": [
+    "apps/api"
+  ],
+  "scripts": {
+    "api:dev": "npm --workspace apps/api run dev",
+    "api:build": "npm --workspace apps/api run build",
+    "api:start": "npm --workspace apps/api run start",
+    "api:migrate": "npm --workspace apps/api run db:migrate"
+  }
+}
+
