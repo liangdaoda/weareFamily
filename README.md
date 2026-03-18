@@ -48,9 +48,19 @@ npm run codex:run:mysql
 - Public endpoints:
   - `/health`
   - `/api/v1/auth/login`
+  - `/api/v1/auth/register`
   - `/api/v1/auth/sso/callback`
 - `TENANT_MODE=saas` expects `tenantId` during login/SSO
 - `TENANT_MODE=private` forces `DEFAULT_TENANT_ID`
+
+## AI Scan (PDF)
+- Default uses heuristic extraction (no external AI needed).
+- To use external AI, set:
+  - `AI_SCAN_PROVIDER=external`
+  - `AI_SCAN_URL=https://your-ai-endpoint`
+  - `AI_SCAN_TIMEOUT_MS=15000`
+- External service should return JSON fields:
+  - `policyNo`, `insurerName`, `productName`, `premium`, `currency`, `startDate`, `endDate`, `aiRiskScore`, `aiNotes`
 
 ## Family and PDF APIs
 - List families:
@@ -61,7 +71,7 @@ npm run codex:run:mysql
   - `POST /api/v1/families/:familyId/members`
 - List documents:
   - `GET /api/v1/families/:familyId/documents`
-- Upload policy PDF form:
+- Upload policy PDF form (AI scan + create policy):
   - `POST /api/v1/families/:familyId/documents` (multipart `file`)
 - Download document:
   - `GET /api/v1/families/:familyId/documents/:documentId/download`
@@ -73,14 +83,7 @@ npm run codex:run:mysql
   flutter pub get
   flutter run -d edge --dart-define=API_BASE_URL=http://localhost:3000
   ```
-- UI now includes:
-  - Dashboard
-  - Policies
-  - Family Center (members + PDF import)
-
-  
-4. 登录
-用演示账号：
-
-broker@example.com / consumer@example.com
-密码： demo1234
+- UI includes:
+  - 仪表盘
+  - 保单列表
+  - 家庭中心（成员 + PDF导入）

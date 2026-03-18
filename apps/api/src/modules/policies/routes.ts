@@ -1,6 +1,7 @@
 // Policy listing and creation endpoints.
 import type { FastifyPluginAsync } from 'fastify';
 
+import { FamilyRepository } from '../families/repository';
 import { PolicyRepository } from './repository';
 import type { CreatePolicyInput, PolicyStatus } from './model';
 
@@ -53,6 +54,7 @@ function assertCreatePolicyBody(body: unknown): CreatePolicyInput {
 
 const policyRoutes: FastifyPluginAsync = async (app) => {
   const repository = new PolicyRepository();
+  const familyRepository = new FamilyRepository();
 
   app.get('/', async (request) => {
     const query = request.query as { status?: string };
@@ -66,13 +68,12 @@ const policyRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/', async (request, reply) => {
-    // Consumers are read-only; brokers/admins can create policies.
-    if (request.userContext.role === 'consumer') {
-      return reply.code(403).send({ message: 'Consumers cannot create policies.' });
-    }
-
     try {
       const input = assertCreatePolicyBody(request.body);
+      const family = await familyRepository.ensureFamilyAccess(request.userContext, input.familyId);
+      if (!family) {
+        return reply.code(404).send({ message: 'Family not found.' });
+      }
       const created = await repository.createPolicy(request.userContext, input);
       return reply.code(201).send(created);
     } catch (error) {

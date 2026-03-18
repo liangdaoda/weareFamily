@@ -57,7 +57,7 @@ class _HomeShellState extends State<HomeShell> {
                         NavigationRailDestination(
                           icon: Icon(Icons.dashboard_outlined),
                           selectedIcon: Icon(Icons.dashboard),
-                          label: Text('仪表盘'),
+                          label: Text('看板'),
                         ),
                         NavigationRailDestination(
                           icon: Icon(Icons.policy_outlined),
@@ -198,7 +198,7 @@ class _MobileNavBar extends StatelessWidget {
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard),
-          label: '仪表盘',
+          label: '看板',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.policy),
@@ -212,4 +212,5 @@ class _MobileNavBar extends StatelessWidget {
     );
   }
 }
+
 

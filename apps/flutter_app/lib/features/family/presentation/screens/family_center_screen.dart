@@ -145,7 +145,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
       await _loadFamilyDetails();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Family member added.')),
+          const SnackBar(content: Text('成员已添加')),
         );
       }
     } catch (error) {
@@ -178,14 +178,14 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
     if (bytes == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to read selected file bytes.')),
+          const SnackBar(content: Text('无法读取所选文件内容')),
         );
       }
       return;
     }
 
     try {
-      await widget.apiClient.uploadFamilyPdf(
+      final result = await widget.apiClient.uploadFamilyPdf(
         profile: widget.profile,
         familyId: familyId,
         file: UploadFilePayload(
@@ -195,8 +195,12 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
       );
       await _loadFamilyDetails();
       if (mounted) {
+        final policy = result.policy;
+        final summary = '识别结果：${policy.policyNo} · ${policy.insurerName} · ${policy.productName} · '
+            '保费 ${policy.premium.toStringAsFixed(2)} ${policy.currency}';
+        final source = result.scanSource == 'external' ? '外部AI' : '规则引擎';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF imported successfully.')),
+          SnackBar(content: Text('PDF导入成功（$source）\n$summary')),
         );
       }
     } catch (error) {
@@ -227,7 +231,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
     if (_families.isEmpty) {
       return const Center(
         child: Text(
-          'No family records found.',
+          '暂无家庭数据',
           style: TextStyle(color: Colors.white70),
         ),
       );
@@ -282,27 +286,27 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Family Center',
+                  '家庭中心',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
                 ),
               ),
               IconButton(
                 onPressed: _loadingDetails ? null : _loadFamilyDetails,
                 icon: const Icon(Icons.refresh, color: Colors.white70),
-                tooltip: 'Refresh',
+                tooltip: '刷新',
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Manage members and import policy forms (PDF).',
+            '管理家庭成员并导入保单PDF。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<String>(
             value: selectedFamily.id,
             decoration: InputDecoration(
-              labelText: 'Selected Family',
+              labelText: '选择家庭',
               labelStyle: const TextStyle(color: Colors.white70),
               filled: true,
               fillColor: Colors.white.withOpacity(0.08),
@@ -349,14 +353,14 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Members (${_members.length})',
+                  '家庭成员 (${_members.length})',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
                 ),
               ),
               FilledButton.icon(
                 onPressed: _loadingDetails ? null : _addMember,
                 icon: const Icon(Icons.person_add),
-                label: const Text('Add'),
+                label: const Text('新增成员'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.mint,
                   foregroundColor: AppColors.ink,
@@ -368,12 +372,12 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
           if (_loadingDetails)
             const Center(child: CircularProgressIndicator(color: AppColors.accent))
           else if (_members.isEmpty)
-            const Text('No members yet.', style: TextStyle(color: Colors.white70))
+            const Text('暂无成员', style: TextStyle(color: Colors.white70))
           else
             ..._members.map((member) => _MemberTile(member: member)),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Owner ID: ${family.ownerUserId}',
+            '户主ID: ${family.ownerUserId}',
             style: const TextStyle(color: Colors.white54, fontSize: 12),
           ),
         ],
@@ -390,14 +394,14 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Policy PDFs (${_documents.length})',
+                  '保单PDF (${_documents.length})',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
                 ),
               ),
               FilledButton.icon(
                 onPressed: _loadingDetails ? null : _uploadPdf,
                 icon: const Icon(Icons.upload_file),
-                label: const Text('Import PDF'),
+                label: const Text('导入PDF'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.ink,
@@ -409,7 +413,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
           if (_loadingDetails)
             const Center(child: CircularProgressIndicator(color: AppColors.accent))
           else if (_documents.isEmpty)
-            const Text('No PDF forms imported.', style: TextStyle(color: Colors.white70))
+            const Text('暂无保单PDF', style: TextStyle(color: Colors.white70))
           else
             ..._documents.map((doc) => _DocumentTile(document: doc)),
         ],
@@ -425,6 +429,14 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final detailParts = <String>[member.relation];
+    if (member.gender != null && member.gender!.isNotEmpty) {
+      detailParts.add(member.gender!);
+    }
+    if (member.phone != null && member.phone!.isNotEmpty) {
+      detailParts.add(member.phone!);
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.sm),
@@ -438,7 +450,7 @@ class _MemberTile extends StatelessWidget {
             radius: 18,
             backgroundColor: AppColors.mint.withOpacity(0.24),
             child: Text(
-              member.name.isEmpty ? '?' : member.name.substring(0, 1).toUpperCase(),
+              member.name.isEmpty ? '?' : member.name.substring(0, 1),
               style: const TextStyle(color: Colors.white),
             ),
           ),
@@ -449,7 +461,7 @@ class _MemberTile extends StatelessWidget {
               children: [
                 Text(member.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                 Text(
-                  '${member.relation}${member.phone == null ? '' : ' · ${member.phone}'}',
+                  detailParts.join(' · '),
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
@@ -487,7 +499,7 @@ class _DocumentTile extends StatelessWidget {
               children: [
                 Text(document.fileName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                 Text(
-                  '${document.docType} · ${kb}KB',
+                  '类型: ${_docTypeLabel(document.docType)} · ${kb}KB',
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
@@ -496,6 +508,15 @@ class _DocumentTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _docTypeLabel(String value) {
+    switch (value) {
+      case 'policy-form':
+        return '保单表单';
+      default:
+        return value;
+    }
   }
 }
 
@@ -525,16 +546,17 @@ class _AddMemberDialog extends StatefulWidget {
 class _AddMemberDialogState extends State<_AddMemberDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _relationController = TextEditingController();
-  final _genderController = TextEditingController();
+  final _relationCustomController = TextEditingController();
   final _birthDateController = TextEditingController();
   final _phoneController = TextEditingController();
+
+  String _relationValue = '本人';
+  String? _genderValue;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _relationController.dispose();
-    _genderController.dispose();
+    _relationCustomController.dispose();
     _birthDateController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -542,9 +564,11 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final showCustomRelation = _relationValue == '其他';
+
     return AlertDialog(
       backgroundColor: const Color(0xFF13283D),
-      title: const Text('Add Family Member', style: TextStyle(color: Colors.white)),
+      title: const Text('添加家庭成员', style: TextStyle(color: Colors.white)),
       content: SizedBox(
         width: 460,
         child: Form(
@@ -552,11 +576,92 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _DialogField(controller: _nameController, label: 'Name', requiredField: true),
-              _DialogField(controller: _relationController, label: 'Relation', requiredField: true),
-              _DialogField(controller: _genderController, label: 'Gender (optional)'),
-              _DialogField(controller: _birthDateController, label: 'Birth Date YYYY-MM-DD (optional)'),
-              _DialogField(controller: _phoneController, label: 'Phone (optional)'),
+              _DialogField(
+                controller: _nameController,
+                label: '姓名',
+                helperText: '请输入2-20个字符',
+                requiredField: true,
+                validator: _validateName,
+              ),
+              DropdownButtonFormField<String>(
+                value: _relationValue,
+                dropdownColor: const Color(0xFF11263A),
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: '关系',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(value: '本人', child: Text('本人')),
+                  DropdownMenuItem(value: '配偶', child: Text('配偶')),
+                  DropdownMenuItem(value: '子女', child: Text('子女')),
+                  DropdownMenuItem(value: '父母', child: Text('父母')),
+                  DropdownMenuItem(value: '祖父母', child: Text('祖父母')),
+                  DropdownMenuItem(value: '其他', child: Text('其他')),
+                ],
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _relationValue = value;
+                  });
+                },
+              ),
+              if (showCustomRelation)
+                _DialogField(
+                  controller: _relationCustomController,
+                  label: '自定义关系',
+                  helperText: '请输入具体关系，如“外祖父”',
+                  requiredField: true,
+                  validator: _validateCustomRelation,
+                ),
+              DropdownButtonFormField<String>(
+                value: _genderValue,
+                dropdownColor: const Color(0xFF11263A),
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: '性别',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(value: '男', child: Text('男')),
+                  DropdownMenuItem(value: '女', child: Text('女')),
+                  DropdownMenuItem(value: '其他', child: Text('其他')),
+                  DropdownMenuItem(value: '未知', child: Text('未知')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _genderValue = value;
+                  });
+                },
+              ),
+              _DialogField(
+                controller: _birthDateController,
+                label: '出生日期',
+                helperText: '格式：YYYY-MM-DD',
+                keyboardType: TextInputType.datetime,
+                validator: _validateBirthDate,
+              ),
+              _DialogField(
+                controller: _phoneController,
+                label: '手机号',
+                helperText: '仅支持11位中国大陆手机号',
+                keyboardType: TextInputType.phone,
+                validator: _validatePhone,
+              ),
             ],
           ),
         ),
@@ -564,24 +669,29 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: const Text('取消'),
         ),
         FilledButton(
           onPressed: () {
             if (!_formKey.currentState!.validate()) {
               return;
             }
+
+            final relation = _relationValue == '其他'
+                ? _relationCustomController.text.trim()
+                : _relationValue;
+
             Navigator.of(context).pop(
               _MemberFormResult(
                 name: _nameController.text.trim(),
-                relation: _relationController.text.trim(),
-                gender: _optional(_genderController.text),
+                relation: relation,
+                gender: _genderValue,
                 birthDate: _optional(_birthDateController.text),
                 phone: _optional(_phoneController.text),
               ),
             );
           },
-          child: const Text('Create'),
+          child: const Text('保存'),
         ),
       ],
     );
@@ -591,6 +701,58 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
     final v = value.trim();
     return v.isEmpty ? null : v;
   }
+
+  String? _validateName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '姓名不能为空';
+    }
+    final trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > 20) {
+      return '姓名长度需为2-20个字符';
+    }
+    return null;
+  }
+
+  String? _validateCustomRelation(String? value) {
+    if (_relationValue != '其他') {
+      return null;
+    }
+    if (value == null || value.trim().isEmpty) {
+      return '请输入自定义关系';
+    }
+    return null;
+  }
+
+  String? _validateBirthDate(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+    if (!regex.hasMatch(trimmed)) {
+      return '出生日期格式应为YYYY-MM-DD';
+    }
+    final parsed = DateTime.tryParse(trimmed);
+    if (parsed == null) {
+      return '出生日期无法解析';
+    }
+    if (parsed.isAfter(DateTime.now())) {
+      return '出生日期不能晚于今天';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final regex = RegExp(r'^1\d{10}$');
+    if (!regex.hasMatch(trimmed)) {
+      return '手机号必须为11位数字';
+    }
+    return null;
+  }
 }
 
 class _DialogField extends StatelessWidget {
@@ -598,11 +760,17 @@ class _DialogField extends StatelessWidget {
     required this.controller,
     required this.label,
     this.requiredField = false,
+    this.helperText,
+    this.keyboardType,
+    this.validator,
   });
 
   final TextEditingController controller;
   final String label;
   final bool requiredField;
+  final String? helperText;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
 
   @override
   Widget build(BuildContext context) {
@@ -610,17 +778,21 @@ class _DialogField extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: TextFormField(
         controller: controller,
+        keyboardType: keyboardType,
         style: const TextStyle(color: Colors.white),
-        validator: requiredField
-            ? (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Required';
-                }
-                return null;
-              }
-            : null,
+        validator: validator ??
+            (requiredField
+                ? (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '必填';
+                    }
+                    return null;
+                  }
+                : null),
         decoration: InputDecoration(
           labelText: label,
+          helperText: helperText,
+          helperStyle: const TextStyle(color: Colors.white54),
           labelStyle: const TextStyle(color: Colors.white70),
           filled: true,
           fillColor: Colors.white.withOpacity(0.08),

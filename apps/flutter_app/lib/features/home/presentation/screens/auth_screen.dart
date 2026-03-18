@@ -25,16 +25,21 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController(text: 'broker@example.com');
   final _passwordController = TextEditingController(text: 'demo1234');
+  final _confirmController = TextEditingController();
   UserRole _role = UserRole.broker;
+  bool _isRegister = false;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -69,6 +74,39 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _handleRegister() async {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final session = await widget.apiClient.register(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        name: _nameController.text.trim(),
+        role: _role,
+        tenantId: AppConfig.tenantId,
+      );
+      widget.onAuthenticated(session);
+    } catch (error) {
+      setState(() {
+        _error = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _handleSso() async {
     setState(() {
       _loading = true;
@@ -80,7 +118,7 @@ class _AuthScreenState extends State<AuthScreen> {
         provider: 'demo',
         subject: 'demo-${_role.name}',
         email: _emailController.text.trim(),
-        name: _role == UserRole.broker ? 'Demo Broker' : 'Demo Consumer',
+        name: _role == UserRole.broker ? '演示经纪人' : '演示家庭用户',
         role: _role,
         tenantId: AppConfig.tenantId,
       );
@@ -106,8 +144,17 @@ class _AuthScreenState extends State<AuthScreen> {
     });
   }
 
+  void _switchMode(bool isRegister) {
+    setState(() {
+      _isRegister = isRegister;
+      _error = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isRegister = _isRegister;
+
     return Scaffold(
       body: DecorativeBackground(
         child: SafeArea(
@@ -129,9 +176,11 @@ class _AuthScreenState extends State<AuthScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Welcome back',
+                            isRegister ? '创建新账号' : '欢迎回来',
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
                           ),
+                          const SizedBox(height: AppSpacing.sm),
+                          _AuthModeToggle(isRegister: isRegister, onChanged: _switchMode),
                           const SizedBox(height: AppSpacing.sm),
                           _RoleToggle(role: _role, onChanged: _switchRole),
                           const SizedBox(height: AppSpacing.md),
@@ -139,18 +188,40 @@ class _AuthScreenState extends State<AuthScreen> {
                             key: _formKey,
                             child: Column(
                               children: [
+                                if (isRegister) ...[
+                                  _InputField(
+                                    controller: _nameController,
+                                    label: '姓名',
+                                    icon: Icons.badge_outlined,
+                                    validator: _validateName,
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                ],
                                 _InputField(
                                   controller: _emailController,
-                                  label: 'Email',
+                                  label: '邮箱',
                                   icon: Icons.alternate_email,
+                                  keyboardType: TextInputType.emailAddress,
+                                  validator: _validateEmail,
                                 ),
                                 const SizedBox(height: AppSpacing.sm),
                                 _InputField(
                                   controller: _passwordController,
-                                  label: 'Password',
+                                  label: '密码',
                                   icon: Icons.lock_outline,
                                   obscureText: true,
+                                  validator: isRegister ? _validateStrongPassword : _validatePassword,
                                 ),
+                                if (isRegister) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  _InputField(
+                                    controller: _confirmController,
+                                    label: '确认密码',
+                                    icon: Icons.lock_reset_outlined,
+                                    obscureText: true,
+                                    validator: _validateConfirmPassword,
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -170,7 +241,11 @@ class _AuthScreenState extends State<AuthScreen> {
                             children: [
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _loading ? null : _handleLogin,
+                                  onPressed: _loading
+                                      ? null
+                                      : isRegister
+                                          ? _handleRegister
+                                          : _handleLogin,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppColors.accent,
                                     foregroundColor: AppColors.ink,
@@ -185,27 +260,29 @@ class _AuthScreenState extends State<AuthScreen> {
                                           width: 18,
                                           child: CircularProgressIndicator(strokeWidth: 2),
                                         )
-                                      : const Text('Sign In'),
+                                      : Text(isRegister ? '注册并进入' : '登录'),
                                 ),
                               ),
-                              const SizedBox(width: AppSpacing.sm),
-                              OutlinedButton(
-                                onPressed: _loading ? null : _handleSso,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: BorderSide(color: Colors.white.withOpacity(0.3)),
-                                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                              if (!isRegister) ...[
+                                const SizedBox(width: AppSpacing.sm),
+                                OutlinedButton(
+                                  onPressed: _loading ? null : _handleSso,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
                                   ),
+                                  child: const Text('演示SSO'),
                                 ),
-                                child: const Text('SSO Demo'),
-                              ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: AppSpacing.md),
                           Text(
-                            'Tenant: ${AppConfig.tenantId} · API: ${AppConfig.apiBaseUrl}',
+                            '租户: ${AppConfig.tenantId} · API: ${AppConfig.apiBaseUrl}',
                             style: Theme.of(context)
                                 .textTheme
                                 .labelLarge
@@ -223,6 +300,62 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
     );
   }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '邮箱不能为空';
+    }
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!regex.hasMatch(value.trim())) {
+      return '邮箱格式不正确';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '密码不能为空';
+    }
+    if (value.trim().length < 6) {
+      return '密码至少6位';
+    }
+    return null;
+  }
+
+  String? _validateStrongPassword(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '密码不能为空';
+    }
+    final trimmed = value.trim();
+    if (trimmed.length < 8) {
+      return '密码至少8位';
+    }
+    if (!RegExp(r'[A-Za-z]').hasMatch(trimmed) || !RegExp(r'\d').hasMatch(trimmed)) {
+      return '密码需包含字母和数字';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '请再次输入密码';
+    }
+    if (value.trim() != _passwordController.text.trim()) {
+      return '两次输入的密码不一致';
+    }
+    return null;
+  }
+
+  String? _validateName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '姓名不能为空';
+    }
+    final trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > 20) {
+      return '姓名长度需为2-20个字符';
+    }
+    return null;
+  }
 }
 
 class _HeroHeader extends StatelessWidget {
@@ -238,14 +371,14 @@ class _HeroHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'WeAreFamily',
+          '家庭保单AI管家',
           style: titleStyle,
         ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.15),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
           width: isWide ? 520 : double.infinity,
           child: Text(
-            'AI-powered policy intelligence for brokers and families. A calm command center that keeps every household covered.',
+            '面向经纪人与家庭的保障中枢，实时洞察风险与续期节奏。',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70),
           ),
         ).animate().fadeIn(duration: 600.ms, delay: 120.ms),
@@ -279,31 +412,100 @@ class _RoleToggle extends StatelessWidget {
   }
 }
 
+class _AuthModeToggle extends StatelessWidget {
+  const _AuthModeToggle({required this.isRegister, required this.onChanged});
+
+  final bool isRegister;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          _ModeChip(
+            label: '登录',
+            selected: !isRegister,
+            onTap: () => onChanged(false),
+          ),
+          _ModeChip(
+            label: '注册',
+            selected: isRegister,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: 200.ms,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.mint : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected ? AppColors.ink : Colors.white70,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _InputField extends StatelessWidget {
   const _InputField({
     required this.controller,
     required this.label,
     required this.icon,
     this.obscureText = false,
+    this.keyboardType,
+    this.validator,
   });
 
   final TextEditingController controller;
   final String label;
   final IconData icon;
   final bool obscureText;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
+      keyboardType: keyboardType,
       style: const TextStyle(color: Colors.white),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Required';
-        }
-        return null;
-      },
+      validator: validator,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white70),
@@ -318,4 +520,3 @@ class _InputField extends StatelessWidget {
     );
   }
 }
-

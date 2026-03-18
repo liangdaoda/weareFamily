@@ -6,13 +6,18 @@ import 'package:wearefamily_app/core/theme/app_spacing.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
 
 class PolicyCard extends StatelessWidget {
-  const PolicyCard({super.key, required this.policy});
+  const PolicyCard({
+    super.key,
+    required this.policy,
+    this.onTap,
+  });
 
   final Policy policy;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    final content = GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -42,7 +47,30 @@ class PolicyCard extends StatelessWidget {
             ),
           if (policy.aiNotes != null)
             Text('AI 建议: ${policy.aiNotes}', style: const TextStyle(color: Colors.white70)),
+          if (onTap != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: const [
+                Text('查看详情', style: TextStyle(color: Colors.white70)),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward, size: 16, color: Colors.white70),
+              ],
+            ),
+          ],
         ],
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: content,
       ),
     );
   }
@@ -84,4 +112,5 @@ class _StatusChip extends StatelessWidget {
     );
   }
 }
+
 

@@ -1,9 +1,10 @@
-// Environment config loader and defaults for API runtime.
+﻿// Environment config loader and defaults for API runtime.
 import 'dotenv/config';
 
 export type DbClient = 'postgres' | 'mysql';
 export type TenantMode = 'saas' | 'private';
 export type UserRole = 'broker' | 'consumer' | 'admin';
+export type AiScanProvider = 'heuristic' | 'external';
 
 // Ensure required environment variables are present.
 function readEnv(name: string, fallback?: string): string {
@@ -28,6 +29,12 @@ const dbClient: DbClient = rawDbClient === 'mysql' ? 'mysql' : 'postgres';
 const rawTenantMode = (process.env.TENANT_MODE ?? 'saas').toLowerCase();
 const tenantMode: TenantMode = rawTenantMode === 'private' ? 'private' : 'saas';
 
+const rawAiProvider = (
+  process.env.AI_SCAN_PROVIDER ??
+  (process.env.AI_SCAN_URL ? 'external' : 'heuristic')
+).toLowerCase();
+const aiScanProvider: AiScanProvider = rawAiProvider === 'external' ? 'external' : 'heuristic';
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   host: process.env.HOST ?? '0.0.0.0',
@@ -47,4 +54,7 @@ export const env = {
   jwtIssuer: process.env.JWT_ISSUER ?? 'wearefamily-api',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '12h',
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
+  aiScanProvider,
+  aiScanUrl: process.env.AI_SCAN_URL ?? '',
+  aiScanTimeoutMs: Number(process.env.AI_SCAN_TIMEOUT_MS ?? 15000),
 };

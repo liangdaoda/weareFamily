@@ -1,5 +1,4 @@
-# Flutter app configuration for WeAreFamily.
-name: wearefamily_app
+﻿name: wearefamily_app
 description: Family policy AI visual steward (Flutter)
 publish_to: 'none'
 version: 0.1.0+1
@@ -12,6 +11,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   file_picker: ^8.1.6
+  fl_chart: ^0.68.0
   flutter_animate: ^4.5.0
   google_fonts: ^6.2.1
   http: ^1.2.2

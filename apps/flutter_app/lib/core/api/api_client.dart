@@ -41,7 +41,34 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Login failed.');
+      throw ApiException(_resolveErrorMessage(response.body, '登录失败'));
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return AuthSession.fromJson(payload);
+  }
+
+  Future<AuthSession> register({
+    required String email,
+    required String password,
+    required String name,
+    required UserRole role,
+    required String tenantId,
+  }) async {
+    final response = await _client.post(
+      _buildUri('/api/v1/auth/register'),
+      headers: _baseHeaders(),
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        'name': name,
+        'role': role.name,
+        'tenantId': tenantId,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw ApiException(_resolveErrorMessage(response.body, '注册失败'));
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -70,7 +97,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('SSO login failed.');
+      throw ApiException(_resolveErrorMessage(response.body, 'SSO登录失败'));
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -84,7 +111,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Failed to load dashboard summary.');
+      throw ApiException('看板数据加载失败');
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -98,7 +125,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Failed to load policies.');
+      throw ApiException('保单列表加载失败');
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -108,6 +135,43 @@ class ApiClient {
         .toList();
   }
 
+  Future<Policy> createPolicy({
+    required UserProfile profile,
+    required String familyId,
+    required String policyNo,
+    required String insurerName,
+    required String productName,
+    required double premium,
+    String currency = 'CNY',
+    String status = 'active',
+    required String startDate,
+    String? endDate,
+    String? notes,
+  }) async {
+    final response = await _client.post(
+      _buildUri('/api/v1/policies'),
+      headers: _headersFor(profile),
+      body: jsonEncode({
+        'familyId': familyId,
+        'policyNo': policyNo,
+        'insurerName': insurerName,
+        'productName': productName,
+        'premium': premium,
+        'currency': currency,
+        'status': status,
+        'startDate': startDate,
+        'endDate': endDate,
+        'aiNotes': notes,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw ApiException(_resolveErrorMessage(response.body, '保单创建失败'));
+    }
+
+    return Policy.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<List<Family>> fetchFamilies(UserProfile profile) async {
     final response = await _client.get(
       _buildUri('/api/v1/families'),
@@ -115,7 +179,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Failed to load families.');
+      throw ApiException('家庭列表加载失败');
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -132,7 +196,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Failed to load family members.');
+      throw ApiException('家庭成员加载失败');
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -164,7 +228,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 201) {
-      throw ApiException('Failed to create family member.');
+      throw ApiException('创建家庭成员失败');
     }
 
     return FamilyMember.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
@@ -177,7 +241,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Failed to load family documents.');
+      throw ApiException('保单文档加载失败');
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -187,7 +251,7 @@ class ApiClient {
         .toList();
   }
 
-  Future<FamilyDocument> uploadFamilyPdf({
+  Future<UploadFamilyPdfResult> uploadFamilyPdf({
     required UserProfile profile,
     required String familyId,
     required UploadFilePayload file,
@@ -214,10 +278,18 @@ class ApiClient {
     final streamed = await _client.send(request);
     final body = await streamed.stream.bytesToString();
     if (streamed.statusCode != 201) {
-      throw ApiException('Failed to upload PDF.');
+      throw ApiException(_resolveErrorMessage(body, 'PDF导入失败'));
     }
 
-    return FamilyDocument.fromJson(jsonDecode(body) as Map<String, dynamic>);
+    final payload = jsonDecode(body) as Map<String, dynamic>;
+    final documentJson = (payload['document'] as Map<String, dynamic>?) ?? payload;
+    final policyJson = (payload['policy'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+
+    return UploadFamilyPdfResult(
+      document: FamilyDocument.fromJson(documentJson),
+      policy: Policy.fromJson(policyJson),
+      scanSource: (payload['scan'] as Map<String, dynamic>?)?['source']?.toString(),
+    );
   }
 
   Uri _buildUri(String path) {
@@ -245,6 +317,20 @@ class ApiClient {
       'x-user-role': profile.role.headerValue,
       'x-tenant-id': profile.tenantId,
     };
+  }
+
+  // Extract API error payloads with a safe fallback.
+  String _resolveErrorMessage(String body, String fallback) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic> && decoded['message'] is String) {
+        final message = (decoded['message'] as String).trim();
+        if (message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {}
+    return fallback;
   }
 }
 
@@ -379,6 +465,18 @@ class UploadFilePayload {
 
   final String fileName;
   final Uint8List bytes;
+}
+
+class UploadFamilyPdfResult {
+  UploadFamilyPdfResult({
+    required this.document,
+    required this.policy,
+    required this.scanSource,
+  });
+
+  final FamilyDocument document;
+  final Policy policy;
+  final String? scanSource;
 }
 
 class Family {

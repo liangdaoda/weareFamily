@@ -87,6 +87,23 @@ export class FamilyRepository {
     return rows.map(mapFamily);
   }
 
+  // Create a default family for a newly registered consumer.
+  async createFamily(input: {
+    tenantId: string;
+    ownerUserId: string;
+    name?: string;
+  }): Promise<Family> {
+    const payload: FamilyRow = {
+      id: randomUUID(),
+      tenant_id: input.tenantId,
+      name: input.name ?? '我的家庭',
+      owner_user_id: input.ownerUserId,
+    };
+
+    await db('families').insert(payload);
+    return mapFamily(payload);
+  }
+
   async ensureFamilyAccess(ctx: UserContext, familyId: string): Promise<Family | null> {
     const query = db<FamilyRow>('families').where('tenant_id', ctx.tenantId).andWhere('id', familyId);
     if (ctx.role === 'consumer') {

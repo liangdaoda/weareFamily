@@ -1,16 +1,26 @@
-// Authentication endpoints: login, SSO callback, and current user.
+﻿// Authentication endpoints: login, register, SSO callback, and current user.
 import type { FastifyPluginAsync } from 'fastify';
 import bcrypt from 'bcryptjs';
 
 import { env, type UserRole } from '../../config/env';
+import { FamilyRepository } from '../families/repository';
 import { AuthRepository } from './repository';
 import { signAccessToken } from './service';
 
 const allowedRoles = new Set<UserRole>(['broker', 'consumer', 'admin']);
+const registerRoles = new Set<UserRole>(['broker', 'consumer']);
 
 interface LoginBody {
   email: string;
   password: string;
+  tenantId?: string;
+}
+
+interface RegisterBody {
+  email: string;
+  password: string;
+  name: string;
+  role?: UserRole;
   tenantId?: string;
 }
 
@@ -40,6 +50,44 @@ function assertLoginBody(body: unknown): LoginBody {
   };
 }
 
+function assertRegisterBody(body: unknown): RegisterBody {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Invalid payload: request body must be an object.');
+  }
+
+  const payload = body as Partial<RegisterBody>;
+  if (!payload.email || !payload.password || !payload.name) {
+    throw new Error('Invalid payload: email, password, and name are required.');
+  }
+
+  const email = String(payload.email).trim();
+  const name = String(payload.name).trim();
+  const password = String(payload.password);
+
+  const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error('Invalid payload: email format is invalid.');
+  }
+
+  if (name.length < 2 || name.length > 40) {
+    throw new Error('Invalid payload: name must be 2-40 characters.');
+  }
+
+  if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+    throw new Error('Invalid payload: password must be at least 8 characters and include letters and numbers.');
+  }
+
+  const role = payload.role && registerRoles.has(payload.role) ? payload.role : 'consumer';
+
+  return {
+    email,
+    password,
+    name,
+    role,
+    tenantId: payload.tenantId ? String(payload.tenantId) : undefined,
+  };
+}
+
 function assertSsoBody(body: unknown): SsoBody {
   if (!body || typeof body !== 'object') {
     throw new Error('Invalid payload: request body must be an object.');
@@ -56,7 +104,7 @@ function assertSsoBody(body: unknown): SsoBody {
     provider: String(payload.provider),
     subject: String(payload.subject),
     email: String(payload.email),
-    name: payload.name ? String(payload.name) : 'SSO �û�',
+    name: payload.name ? String(payload.name) : 'SSO 用户',
     role,
     tenantId: payload.tenantId ? String(payload.tenantId) : undefined,
   };
@@ -74,6 +122,7 @@ function resolveTenantId(tenantId?: string): string {
 
 const authRoutes: FastifyPluginAsync = async (app) => {
   const repository = new AuthRepository();
+  const familyRepository = new FamilyRepository();
 
   app.post('/login', async (request, reply) => {
     try {
@@ -100,6 +149,61 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       });
 
       return reply.send({
+        accessToken: token,
+        tokenType: 'Bearer',
+        expiresIn: env.jwtExpiresIn,
+        user: {
+          id: user.id,
+          role: user.role,
+          name: user.name,
+          email: user.email,
+          tenantId: user.tenantId,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid request body.';
+      return reply.code(400).send({ message });
+    }
+  });
+
+  // Email + password registration for broker/consumer users.
+  app.post('/register', async (request, reply) => {
+    try {
+      const body = assertRegisterBody(request.body);
+      const tenantId = resolveTenantId(body.tenantId);
+
+      const existing = await repository.findByEmail(tenantId, body.email);
+      if (existing) {
+        return reply.code(409).send({ message: '该邮箱已注册，请直接登录。' });
+      }
+
+      const passwordHash = await bcrypt.hash(body.password, 10);
+      const user = await repository.createUser({
+        tenantId,
+        role: body.role ?? 'consumer',
+        name: body.name,
+        email: body.email,
+        passwordHash,
+      });
+
+      if (user.role === 'consumer') {
+        await familyRepository.createFamily({
+          tenantId: user.tenantId,
+          ownerUserId: user.id,
+          name: `${user.name}的家庭`,
+        });
+      }
+
+      const token = signAccessToken({
+        sub: user.id,
+        role: user.role,
+        tenantId: user.tenantId,
+        tenantMode: env.tenantMode,
+        name: user.name,
+        email: user.email,
+      });
+
+      return reply.code(201).send({
         accessToken: token,
         tokenType: 'Bearer',
         expiresIn: env.jwtExpiresIn,
