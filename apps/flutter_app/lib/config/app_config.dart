@@ -1,4 +1,4 @@
-﻿// App-wide configuration sourced from Dart defines.
+// App-wide configuration sourced from Dart defines.
 class AppConfig {
   // API base URL override: --dart-define=API_BASE_URL=http://localhost:3000
   static const String apiBaseUrl = String.fromEnvironment(
@@ -12,5 +12,3 @@ class AppConfig {
     defaultValue: 'tenant-demo',
   );
 }
-
-

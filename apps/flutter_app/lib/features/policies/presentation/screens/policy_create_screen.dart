@@ -1,4 +1,5 @@
-﻿// Policy creation form for manual policy entry.
+// Policy creation form for manual policy entry.
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:wearefamily_app/core/api/api_client.dart';
@@ -9,7 +10,8 @@ import 'package:wearefamily_app/shared/widgets/decorative_background.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
 
 class PolicyCreateScreen extends StatefulWidget {
-  const PolicyCreateScreen({super.key, required this.profile, required this.apiClient});
+  const PolicyCreateScreen(
+      {super.key, required this.profile, required this.apiClient});
 
   final UserProfile profile;
   final ApiClient apiClient;
@@ -68,7 +70,9 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
             final isWide = constraints.maxWidth >= 900;
             final padding = EdgeInsets.fromLTRB(
               isWide ? 64 : AppSpacing.lg,
-              kToolbarHeight + MediaQuery.of(context).padding.top + AppSpacing.lg,
+              kToolbarHeight +
+                  MediaQuery.of(context).padding.top +
+                  AppSpacing.lg,
               isWide ? 64 : AppSpacing.lg,
               AppSpacing.lg,
             );
@@ -77,19 +81,23 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
               future: widget.apiClient.fetchFamilies(widget.profile),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                  return const Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.accent));
                 }
 
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text('加载家庭失败: ${snapshot.error}', style: const TextStyle(color: Colors.white70)),
+                    child: Text('加载家庭失败: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.white70)),
                   );
                 }
 
                 final families = snapshot.data ?? [];
                 if (families.isEmpty) {
                   return const Center(
-                    child: Text('请先创建家庭档案后再添加保单。', style: TextStyle(color: Colors.white70)),
+                    child: Text('请先创建家庭档案后再添加保单。',
+                        style: TextStyle(color: Colors.white70)),
                   );
                 }
 
@@ -104,12 +112,18 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                       children: [
                         Text(
                           '手动录入保单信息',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(color: Colors.white),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
                           '适用于纸质保单或非标准 PDF 场景。',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Colors.white70),
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         GlassCard(
@@ -119,7 +133,7 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               _SectionTitle('基础信息'),
                               const SizedBox(height: AppSpacing.sm),
                               DropdownButtonFormField<String>(
-                                value: _familyId,
+                                initialValue: _familyId,
                                 decoration: _inputDecoration('所属家庭'),
                                 items: families
                                     .map((family) => DropdownMenuItem(
@@ -127,8 +141,10 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                                           child: Text(family.name),
                                         ))
                                     .toList(),
-                                onChanged: (value) => setState(() => _familyId = value),
-                                validator: (value) => value == null ? '请选择家庭' : null,
+                                onChanged: (value) =>
+                                    setState(() => _familyId = value),
+                                validator: (value) =>
+                                    value == null ? '请选择家庭' : null,
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               TextFormField(
@@ -169,15 +185,20 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               DropdownButtonFormField<String>(
-                                value: _status,
+                                initialValue: _status,
                                 decoration: _inputDecoration('状态'),
                                 items: const [
-                                  DropdownMenuItem(value: 'active', child: Text('生效中')),
-                                  DropdownMenuItem(value: 'pending', child: Text('待生效')),
-                                  DropdownMenuItem(value: 'expired', child: Text('已到期')),
-                                  DropdownMenuItem(value: 'cancelled', child: Text('已终止')),
+                                  DropdownMenuItem(
+                                      value: 'active', child: Text('生效中')),
+                                  DropdownMenuItem(
+                                      value: 'pending', child: Text('待生效')),
+                                  DropdownMenuItem(
+                                      value: 'expired', child: Text('已到期')),
+                                  DropdownMenuItem(
+                                      value: 'cancelled', child: Text('已终止')),
                                 ],
-                                onChanged: (value) => setState(() => _status = value ?? 'active'),
+                                onChanged: (value) =>
+                                    setState(() => _status = value ?? 'active'),
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               _SectionTitle('保障期限'),
@@ -205,10 +226,14 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               ),
                             ],
                           ),
-                        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.08),
+                        )
+                            .animate()
+                            .fadeIn(duration: 400.ms)
+                            .slideY(begin: 0.08),
                         const SizedBox(height: AppSpacing.lg),
                         if (_error != null)
-                          Text(_error!, style: const TextStyle(color: AppColors.rose)),
+                          Text(_error!,
+                              style: const TextStyle(color: AppColors.rose)),
                         const SizedBox(height: AppSpacing.sm),
                         SizedBox(
                           width: double.infinity,
@@ -218,13 +243,15 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               backgroundColor: AppColors.accent,
                               foregroundColor: AppColors.ink,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(9)),
                             ),
                             child: _submitting
                                 ? const SizedBox(
                                     height: 18,
                                     width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : const Text('保存保单'),
                           ),
@@ -323,8 +350,12 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
             : _currencyController.text.trim().toUpperCase(),
         status: _status,
         startDate: _startDateController.text.trim(),
-        endDate: _endDateController.text.trim().isEmpty ? null : _endDateController.text.trim(),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        endDate: _endDateController.text.trim().isEmpty
+            ? null
+            : _endDateController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
 
       if (!mounted) {
@@ -361,7 +392,7 @@ class _DateField extends StatelessWidget {
       readOnly: true,
       style: const TextStyle(color: Colors.white),
       decoration: _inputDecoration(label).copyWith(
-        suffixIcon: const Icon(Icons.date_range, color: Colors.white70),
+        suffixIcon: const Icon(CupertinoIcons.calendar, color: Colors.white70),
       ),
       validator: validator,
       onTap: onPick,
@@ -378,7 +409,10 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
+      style: Theme.of(context)
+          .textTheme
+          .titleMedium
+          ?.copyWith(color: Colors.white),
     );
   }
 }
@@ -388,9 +422,9 @@ InputDecoration _inputDecoration(String label) {
     labelText: label,
     labelStyle: const TextStyle(color: Colors.white70),
     filled: true,
-    fillColor: Colors.white.withOpacity(0.08),
+    fillColor: Colors.white.withValues(alpha: 0.08),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(9),
       borderSide: BorderSide.none,
     ),
   );

@@ -26,6 +26,14 @@ export interface CreateFamilyMemberInput {
   phone?: string | null;
 }
 
+export interface UpdateFamilyMemberInput {
+  name: string;
+  relation: string;
+  gender?: string | null;
+  birthDate?: string | null;
+  phone?: string | null;
+}
+
 export interface FamilyDocument {
   id: string;
   familyId: string;

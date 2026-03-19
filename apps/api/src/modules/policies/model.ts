@@ -1,5 +1,12 @@
 // Domain model types for policies.
+import type { PolicyCoverageItem, PolicyFeatureSignals, PolicyInsight } from './insight';
+
 export type PolicyStatus = 'active' | 'pending' | 'expired' | 'cancelled';
+
+export interface PolicyAiPayload {
+  signals?: Partial<PolicyFeatureSignals> | null;
+  coverageItems?: PolicyCoverageItem[] | null;
+}
 
 export interface Policy {
   id: string;
@@ -15,6 +22,8 @@ export interface Policy {
   endDate: string | null;
   aiRiskScore: number | null;
   aiNotes: string | null;
+  aiPayload?: PolicyAiPayload | null;
+  aiInsight?: PolicyInsight;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -32,6 +41,7 @@ export interface CreatePolicyInput {
   endDate?: string | null;
   aiRiskScore?: number | null;
   aiNotes?: string | null;
+  aiPayload?: PolicyAiPayload | null;
 }
 
 export interface ListPoliciesInput {

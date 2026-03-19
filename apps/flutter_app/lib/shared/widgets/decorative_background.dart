@@ -1,4 +1,4 @@
-﻿// Layered gradient background with decorative dots.
+// Layered gradient background with decorative dots.
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -36,7 +36,9 @@ class _DotField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _DotFieldPainter(Theme.of(context).colorScheme.onPrimary.withOpacity(0.12)),
+      painter: _DotFieldPainter(
+        Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.08),
+      ),
     );
   }
 }
@@ -50,9 +52,9 @@ class _DotFieldPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
     final random = Random(42);
-    const double radius = 1.6;
+    const double radius = 1.4;
 
-    for (var i = 0; i < 140; i++) {
+    for (var i = 0; i < 96; i++) {
       final dx = random.nextDouble() * size.width;
       final dy = random.nextDouble() * size.height;
       canvas.drawCircle(Offset(dx, dy), radius, paint);
@@ -62,5 +64,3 @@ class _DotFieldPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DotFieldPainter oldDelegate) => false;
 }
-
-

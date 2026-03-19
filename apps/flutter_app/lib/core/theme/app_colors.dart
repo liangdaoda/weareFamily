@@ -1,4 +1,4 @@
-﻿// App color palette and gradients.
+// App color palette and gradients.
 import 'package:flutter/material.dart';
 
 class AppColors {
@@ -22,5 +22,3 @@ class AppColors {
     end: Alignment.bottomCenter,
   );
 }
-
-

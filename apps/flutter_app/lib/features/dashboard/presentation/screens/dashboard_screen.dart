@@ -1,9 +1,10 @@
-﻿// Dashboard view showing summary metrics and analytics charts.
+// Dashboard view showing summary metrics and analytics charts.
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:wearefamily_app/core/api/api_client.dart';
 import 'package:wearefamily_app/core/api/user_profile.dart';
+import 'package:wearefamily_app/core/i18n/locale_text.dart';
 import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
 import 'package:wearefamily_app/features/policies/presentation/screens/policies_screen.dart';
@@ -27,18 +28,25 @@ class DashboardScreen extends StatelessWidget {
       future: apiClient.fetchDashboardSummary(profile),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+          return const Center(
+              child: CircularProgressIndicator(color: AppColors.accent));
         }
 
         if (snapshot.hasError) {
           return Center(
-            child: Text('加载失败: ${snapshot.error}', style: const TextStyle(color: Colors.white70)),
+            child: Text(
+              '${context.tr('加载失败', 'Load failed')}: ${snapshot.error}',
+              style: const TextStyle(color: Colors.white70),
+            ),
           );
         }
 
         final summary = snapshot.data;
         if (summary == null) {
-          return const Center(child: Text('暂无数据', style: TextStyle(color: Colors.white70)));
+          return Center(
+            child: Text(context.tr('暂无数据', 'No data'),
+                style: const TextStyle(color: Colors.white70)),
+          );
         }
 
         final monthlyPremium = summary.metrics.premiumTotal / 12.0;
@@ -58,7 +66,8 @@ class DashboardScreen extends StatelessWidget {
                           begin: const Offset(0, 0.05),
                           end: Offset.zero,
                         ).animate(
-                          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                          CurvedAnimation(
+                              parent: animation, curve: Curves.easeOutCubic),
                         ),
                         child: PoliciesScreen(
                           profile: profile,
@@ -81,33 +90,56 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '家庭保障概览',
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
+                    context.tr('家庭保障概览', 'Family Protection Overview'),
+                    style: Theme.of(context)
+                        .textTheme
+                        .displayMedium
+                        ?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    '租户: ${summary.tenantId} · 角色: ${profile.role.displayName}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                    '${context.tr('租户', 'Tenant')}: ${summary.tenantId} · ${context.tr('角色', 'Role')}: '
+                    '${profile.role.displayNameFor(Localizations.localeOf(context))}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.white70),
                   ),
+                  if (summary.metrics.expiringSoon > 0) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _ExpiryAlertBanner(
+                      expiringSoonCount: summary.metrics.expiringSoon,
+                      onTap: () =>
+                          openPolicyList(const PolicyListFilter.expiringSoon()),
+                    ).animate().fadeIn(delay: 70.ms).slideY(begin: 0.08),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   Wrap(
                     spacing: AppSpacing.lg,
                     runSpacing: AppSpacing.lg,
                     children: [
                       SizedBox(
-                        width: isWide ? (constraints.maxWidth - AppSpacing.lg) / 2 : double.infinity,
+                        width: isWide
+                            ? (constraints.maxWidth - AppSpacing.lg) / 2
+                            : double.infinity,
                         child: _PolicySummaryCard(
                           total: summary.metrics.totalPolicies,
                           active: summary.metrics.activePolicies,
                           expiringSoon: summary.metrics.expiringSoon,
-                          onTapTotal: () => openPolicyList(const PolicyListFilter.all()),
-                          onTapActive: () => openPolicyList(const PolicyListFilter.active()),
-                          onTapExpiring: () => openPolicyList(const PolicyListFilter.expiringSoon()),
+                          onTapTotal: () =>
+                              openPolicyList(const PolicyListFilter.all()),
+                          onTapActive: () =>
+                              openPolicyList(const PolicyListFilter.active()),
+                          onTapExpiring: () => openPolicyList(
+                              const PolicyListFilter.expiringSoon()),
                         ),
                       ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.1),
                       SizedBox(
-                        width: isWide ? (constraints.maxWidth - AppSpacing.lg) / 2 : double.infinity,
-                        child: _PremiumSummaryCard(totalPremium: summary.metrics.premiumTotal),
+                        width: isWide
+                            ? (constraints.maxWidth - AppSpacing.lg) / 2
+                            : double.infinity,
+                        child: _PremiumSummaryCard(
+                            totalPremium: summary.metrics.premiumTotal),
                       ).animate().fadeIn(delay: 140.ms).slideY(begin: 0.1),
                     ],
                   ),
@@ -116,7 +148,9 @@ class DashboardScreen extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _RiskRadarCard(summary: summary, premiumRatio: premiumRatio)),
+                        Expanded(
+                            child: _RiskRadarCard(
+                                summary: summary, premiumRatio: premiumRatio)),
                         const SizedBox(width: AppSpacing.lg),
                         Expanded(
                           child: _IncomeBarCard(
@@ -127,9 +161,12 @@ class DashboardScreen extends StatelessWidget {
                       ],
                     )
                   else ...[
-                    _RiskRadarCard(summary: summary, premiumRatio: premiumRatio),
+                    _RiskRadarCard(
+                        summary: summary, premiumRatio: premiumRatio),
                     const SizedBox(height: AppSpacing.lg),
-                    _IncomeBarCard(monthlyPremium: monthlyPremium, premiumRatio: premiumRatio),
+                    _IncomeBarCard(
+                        monthlyPremium: monthlyPremium,
+                        premiumRatio: premiumRatio),
                   ],
                 ],
               ),
@@ -137,6 +174,84 @@ class DashboardScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _ExpiryAlertBanner extends StatelessWidget {
+  const _ExpiryAlertBanner({
+    required this.expiringSoonCount,
+    required this.onTap,
+  });
+
+  final int expiringSoonCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).languageCode.toLowerCase();
+    final isChinese = locale.startsWith('zh');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            gradient: const LinearGradient(
+              colors: [Color(0xFFF55A3C), Color(0xFFFF9A5F)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66F55A3C),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                const Icon(Icons.notification_important_rounded,
+                    color: Colors.white),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    isChinese
+                        ? '你有 $expiringSoonCount 份保单将在30天内到期，点击查看并处理续保。'
+                        : '$expiringSoonCount policies expire within 30 days. Tap to review renewals.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    context.tr('立即查看', 'Review now'),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -166,7 +281,10 @@ class _PolicySummaryCard extends StatelessWidget {
         children: [
           Text(
             '保单概览',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: AppSpacing.sm),
           LayoutBuilder(
@@ -198,7 +316,8 @@ class _PolicySummaryCard extends StatelessWidget {
                   children: items
                       .map((item) => Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6),
                               child: item,
                             ),
                           ))
@@ -238,10 +357,10 @@ class _PolicyMetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(0.06),
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.white.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(9),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -249,7 +368,7 @@ class _PolicyMetricTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: Colors.white.withOpacity(0.12),
+                backgroundColor: Colors.white.withValues(alpha: 0.12),
                 child: Icon(icon, color: AppColors.accent, size: 18),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -257,12 +376,17 @@ class _PolicyMetricTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(label,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 4),
                     _AnimatedMetricValue(
                       value: value,
                       formatter: _formatInt,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(color: Colors.white),
                     ),
                   ],
                 ),
@@ -289,18 +413,27 @@ class _PremiumSummaryCard extends StatelessWidget {
         children: [
           Text(
             '年度保费合计',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: AppSpacing.sm),
           _AnimatedMetricValue(
             value: totalPremium,
             formatter: _formatCurrency,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.white),
+            style: Theme.of(context)
+                .textTheme
+                .displaySmall
+                ?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             '用于评估家庭保障预算的总量级。',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.white70),
           ),
         ],
       ),
@@ -347,8 +480,10 @@ class _RiskRadarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final coverage = _safeRatio(summary.metrics.activePolicies, summary.metrics.totalPolicies);
-    final renewalPressure = _safeRatio(summary.metrics.expiringSoon, summary.metrics.totalPolicies);
+    final coverage = _safeRatio(
+        summary.metrics.activePolicies, summary.metrics.totalPolicies);
+    final renewalPressure =
+        _safeRatio(summary.metrics.expiringSoon, summary.metrics.totalPolicies);
     final premiumPressure = premiumRatio.clamp(0.0, 1.0);
     final riskIndex = (coverage + renewalPressure + premiumPressure) / 3.0;
 
@@ -360,7 +495,10 @@ class _RiskRadarCard extends StatelessWidget {
         children: [
           Text(
             'AI风险雷达',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
@@ -370,19 +508,22 @@ class _RiskRadarCard extends StatelessWidget {
                 dataSets: [
                   RadarDataSet(
                     borderColor: AppColors.accent,
-                    fillColor: AppColors.accent.withOpacity(0.25),
+                    fillColor: AppColors.accent.withValues(alpha: 0.25),
                     entryRadius: 2,
                     dataEntries: values
-                        .map((value) => RadarEntry(value: (value * 5).clamp(0, 5)))
+                        .map((value) =>
+                            RadarEntry(value: (value * 5).clamp(0, 5)))
                         .toList(),
                   ),
                 ],
                 radarBackgroundColor: Colors.transparent,
                 borderData: FlBorderData(show: false),
                 radarBorderData: const BorderSide(color: Colors.white24),
-                titleTextStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+                titleTextStyle:
+                    const TextStyle(color: Colors.white70, fontSize: 12),
                 tickBorderData: const BorderSide(color: Colors.white12),
-                ticksTextStyle: const TextStyle(color: Colors.white38, fontSize: 10),
+                ticksTextStyle:
+                    const TextStyle(color: Colors.white38, fontSize: 10),
                 titlePositionPercentageOffset: 0.16,
                 getTitle: (index, angle) {
                   switch (index) {
@@ -448,7 +589,10 @@ class _IncomeBarCard extends StatelessWidget {
         children: [
           Text(
             '保费与收入对比',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
@@ -465,9 +609,12 @@ class _IncomeBarCard extends StatelessWidget {
                 gridData: FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -476,7 +623,8 @@ class _IncomeBarCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             '对比',
-                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12),
                           ),
                         );
                       },
@@ -546,7 +694,8 @@ class _LegendDot extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(label,
+            style: const TextStyle(color: Colors.white70, fontSize: 12)),
       ],
     );
   }

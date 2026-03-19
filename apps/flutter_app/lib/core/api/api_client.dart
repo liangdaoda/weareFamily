@@ -1,4 +1,4 @@
-﻿// Minimal API client for auth, dashboard, policy, and family endpoints.
+// Minimal API client for auth, dashboard, policy, and family endpoints.
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -16,6 +16,7 @@ class ApiClient {
   final String _baseUrl;
   final http.Client _client;
   String? _accessToken;
+  String _languageCode = 'zh';
 
   void dispose() {
     _client.close();
@@ -23,6 +24,10 @@ class ApiClient {
 
   void setAccessToken(String? token) {
     _accessToken = token;
+  }
+
+  void setLanguage(String languageCode) {
+    _languageCode = languageCode.toLowerCase().startsWith('en') ? 'en' : 'zh';
   }
 
   Future<AuthSession> login({
@@ -107,7 +112,7 @@ class ApiClient {
   Future<DashboardSummary> fetchDashboardSummary(UserProfile profile) async {
     final response = await _client.get(
       _buildUri('/api/v1/dashboard/summary'),
-      headers: _headersFor(profile),
+      headers: _authHeadersFor(profile),
     );
 
     if (response.statusCode != 200) {
@@ -121,7 +126,7 @@ class ApiClient {
   Future<List<Policy>> fetchPolicies(UserProfile profile) async {
     final response = await _client.get(
       _buildUri('/api/v1/policies'),
-      headers: _headersFor(profile),
+      headers: _authHeadersFor(profile),
     );
 
     if (response.statusCode != 200) {
@@ -172,10 +177,25 @@ class ApiClient {
     return Policy.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
+  // Delete a policy by id.
+  Future<void> deletePolicy({
+    required UserProfile profile,
+    required String policyId,
+  }) async {
+    final response = await _client.delete(
+      _buildUri('/api/v1/policies/$policyId'),
+      headers: _authHeadersFor(profile),
+    );
+
+    if (response.statusCode != 204) {
+      throw ApiException(_resolveErrorMessage(response.body, '删除保单失败'));
+    }
+  }
+
   Future<List<Family>> fetchFamilies(UserProfile profile) async {
     final response = await _client.get(
       _buildUri('/api/v1/families'),
-      headers: _headersFor(profile),
+      headers: _authHeadersFor(profile),
     );
 
     if (response.statusCode != 200) {
@@ -189,10 +209,11 @@ class ApiClient {
         .toList();
   }
 
-  Future<List<FamilyMember>> fetchFamilyMembers(UserProfile profile, String familyId) async {
+  Future<List<FamilyMember>> fetchFamilyMembers(
+      UserProfile profile, String familyId) async {
     final response = await _client.get(
       _buildUri('/api/v1/families/$familyId/members'),
-      headers: _headersFor(profile),
+      headers: _authHeadersFor(profile),
     );
 
     if (response.statusCode != 200) {
@@ -231,13 +252,61 @@ class ApiClient {
       throw ApiException('创建家庭成员失败');
     }
 
-    return FamilyMember.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return FamilyMember.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<List<FamilyDocument>> fetchFamilyDocuments(UserProfile profile, String familyId) async {
+  Future<FamilyMember> updateFamilyMember({
+    required UserProfile profile,
+    required String familyId,
+    required String memberId,
+    required String name,
+    required String relation,
+    String? gender,
+    String? birthDate,
+    String? phone,
+  }) async {
+    final response = await _client.patch(
+      _buildUri('/api/v1/families/$familyId/members/$memberId'),
+      headers: _headersFor(profile),
+      body: jsonEncode({
+        'name': name,
+        'relation': relation,
+        'gender': gender,
+        'birthDate': birthDate,
+        'phone': phone,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(_resolveErrorMessage(response.body, '更新家庭成员失败'));
+    }
+
+    return FamilyMember.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  // Delete one family member.
+  Future<void> deleteFamilyMember({
+    required UserProfile profile,
+    required String familyId,
+    required String memberId,
+  }) async {
+    final response = await _client.delete(
+      _buildUri('/api/v1/families/$familyId/members/$memberId'),
+      headers: _authHeadersFor(profile),
+    );
+
+    if (response.statusCode != 204) {
+      throw ApiException(_resolveErrorMessage(response.body, '删除家庭成员失败'));
+    }
+  }
+
+  Future<List<FamilyDocument>> fetchFamilyDocuments(
+      UserProfile profile, String familyId) async {
     final response = await _client.get(
       _buildUri('/api/v1/families/$familyId/documents'),
-      headers: _headersFor(profile),
+      headers: _authHeadersFor(profile),
     );
 
     if (response.statusCode != 200) {
@@ -249,6 +318,21 @@ class ApiClient {
         .whereType<Map<String, dynamic>>()
         .map(FamilyDocument.fromJson)
         .toList();
+  }
+
+  Future<FamilyInsight> fetchFamilyInsight(
+      UserProfile profile, String familyId) async {
+    final response = await _client.get(
+      _buildUri('/api/v1/families/$familyId/insights'),
+      headers: _authHeadersFor(profile),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('家庭AI分析加载失败');
+    }
+
+    return FamilyInsight.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<UploadFamilyPdfResult> uploadFamilyPdf({
@@ -282,18 +366,43 @@ class ApiClient {
     }
 
     final payload = jsonDecode(body) as Map<String, dynamic>;
-    final documentJson = (payload['document'] as Map<String, dynamic>?) ?? payload;
-    final policyJson = (payload['policy'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+    final documentJson =
+        (payload['document'] as Map<String, dynamic>?) ?? payload;
+    final policyJson = (payload['policy'] as Map<String, dynamic>?) ??
+        const <String, dynamic>{};
 
     return UploadFamilyPdfResult(
       document: FamilyDocument.fromJson(documentJson),
       policy: Policy.fromJson(policyJson),
-      scanSource: (payload['scan'] as Map<String, dynamic>?)?['source']?.toString(),
+      scanSource:
+          (payload['scan'] as Map<String, dynamic>?)?['source']?.toString(),
+    );
+  }
+
+  Future<DeleteFamilyDocumentResult> deleteFamilyDocument({
+    required UserProfile profile,
+    required String familyId,
+    required String documentId,
+  }) async {
+    final response = await _client.delete(
+      _buildUri('/api/v1/families/$familyId/documents/$documentId'),
+      headers: _authHeadersFor(profile),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+          _resolveErrorMessage(response.body, 'Delete PDF failed'));
+    }
+
+    return DeleteFamilyDocumentResult.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
     );
   }
 
   Uri _buildUri(String path) {
-    final base = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final base = _baseUrl.endsWith('/')
+        ? _baseUrl.substring(0, _baseUrl.length - 1)
+        : _baseUrl;
     return Uri.parse('$base$path');
   }
 
@@ -316,6 +425,7 @@ class ApiClient {
       'x-user-id': profile.userId,
       'x-user-role': profile.role.headerValue,
       'x-tenant-id': profile.tenantId,
+      'x-lang': _languageCode,
     };
   }
 
@@ -360,7 +470,8 @@ class AuthSession {
       accessToken: (json['accessToken'] ?? '').toString(),
       tokenType: (json['tokenType'] ?? '').toString(),
       expiresIn: (json['expiresIn'] ?? '').toString(),
-      user: AuthUser.fromJson(json['user'] as Map<String, dynamic>? ?? const <String, dynamic>{}),
+      user: AuthUser.fromJson(
+          json['user'] as Map<String, dynamic>? ?? const <String, dynamic>{}),
     );
   }
 }
@@ -416,6 +527,7 @@ class DashboardMetrics {
 class Policy {
   Policy({
     required this.id,
+    required this.familyId,
     required this.policyNo,
     required this.insurerName,
     required this.productName,
@@ -426,9 +538,12 @@ class Policy {
     required this.endDate,
     required this.aiRiskScore,
     required this.aiNotes,
+    required this.aiPayload,
+    required this.aiInsight,
   });
 
   final String id;
+  final String familyId;
   final String policyNo;
   final String insurerName;
   final String productName;
@@ -439,10 +554,13 @@ class Policy {
   final String? endDate;
   final double? aiRiskScore;
   final String? aiNotes;
+  final PolicyAiPayload? aiPayload;
+  final PolicyAiInsight? aiInsight;
 
   factory Policy.fromJson(Map<String, dynamic> json) {
     return Policy(
       id: (json['id'] ?? '').toString(),
+      familyId: (json['familyId'] ?? '').toString(),
       policyNo: (json['policyNo'] ?? '').toString(),
       insurerName: (json['insurerName'] ?? '').toString(),
       productName: (json['productName'] ?? '').toString(),
@@ -453,6 +571,193 @@ class Policy {
       endDate: json['endDate']?.toString(),
       aiRiskScore: (json['aiRiskScore'] as num?)?.toDouble(),
       aiNotes: json['aiNotes']?.toString(),
+      aiPayload: (json['aiPayload'] as Map<String, dynamic>?) == null
+          ? null
+          : PolicyAiPayload.fromJson(json['aiPayload'] as Map<String, dynamic>),
+      aiInsight: (json['aiInsight'] as Map<String, dynamic>?) == null
+          ? null
+          : PolicyAiInsight.fromJson(json['aiInsight'] as Map<String, dynamic>),
+    );
+  }
+}
+
+class PolicyAiPayload {
+  PolicyAiPayload({
+    required this.coverageItems,
+    required this.insuredMemberIds,
+  });
+
+  final List<PolicyCoverageItem> coverageItems;
+  final List<String> insuredMemberIds;
+
+  factory PolicyAiPayload.fromJson(Map<String, dynamic> json) {
+    final ids = <String>{};
+    final rawInsuredIds = json['insuredMemberIds'];
+    if (rawInsuredIds is List) {
+      for (final item in rawInsuredIds) {
+        final value = item?.toString() ?? '';
+        if (value.isNotEmpty) {
+          ids.add(value);
+        }
+      }
+    }
+    final rawMemberIds = json['memberIds'];
+    if (rawMemberIds is List) {
+      for (final item in rawMemberIds) {
+        final value = item?.toString() ?? '';
+        if (value.isNotEmpty) {
+          ids.add(value);
+        }
+      }
+    }
+    final rawMemberId = json['memberId']?.toString() ?? '';
+    if (rawMemberId.isNotEmpty) {
+      ids.add(rawMemberId);
+    }
+
+    return PolicyAiPayload(
+      coverageItems:
+          (json['coverageItems'] as List<dynamic>? ?? const <dynamic>[])
+              .whereType<Map<String, dynamic>>()
+              .map(PolicyCoverageItem.fromJson)
+              .toList(),
+      insuredMemberIds: ids.toList(growable: false),
+    );
+  }
+}
+
+class PolicyAiInsight {
+  PolicyAiInsight({
+    required this.generatedAt,
+    required this.locale,
+    required this.policyType,
+    required this.policyTypeLabel,
+    required this.protectionScore,
+    required this.riskScore,
+    required this.riskLevel,
+    required this.summary,
+    required this.strengths,
+    required this.weaknesses,
+    required this.recommendations,
+    required this.coverageItems,
+    required this.competitive,
+  });
+
+  final String generatedAt;
+  final String locale;
+  final String policyType;
+  final String policyTypeLabel;
+  final int protectionScore;
+  final int riskScore;
+  final String riskLevel;
+  final String summary;
+  final List<String> strengths;
+  final List<String> weaknesses;
+  final List<String> recommendations;
+  final List<PolicyCoverageItem> coverageItems;
+  final PolicyCompetitiveInsight competitive;
+
+  factory PolicyAiInsight.fromJson(Map<String, dynamic> json) {
+    return PolicyAiInsight(
+      generatedAt: (json['generatedAt'] ?? '').toString(),
+      locale: (json['locale'] ?? '').toString(),
+      policyType: (json['policyType'] ?? '').toString(),
+      policyTypeLabel: (json['policyTypeLabel'] ?? '').toString(),
+      protectionScore: (json['protectionScore'] as num? ?? 0).toInt(),
+      riskScore: (json['riskScore'] as num? ?? 0).toInt(),
+      riskLevel: (json['riskLevel'] ?? '').toString(),
+      summary: (json['summary'] ?? '').toString(),
+      strengths: (json['strengths'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString())
+          .toList(),
+      weaknesses: (json['weaknesses'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString())
+          .toList(),
+      recommendations:
+          (json['recommendations'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => item.toString())
+              .toList(),
+      coverageItems:
+          (json['coverageItems'] as List<dynamic>? ?? const <dynamic>[])
+              .whereType<Map<String, dynamic>>()
+              .map(PolicyCoverageItem.fromJson)
+              .toList(),
+      competitive: PolicyCompetitiveInsight.fromJson(
+        (json['competitive'] as Map<String, dynamic>?) ??
+            const <String, dynamic>{},
+      ),
+    );
+  }
+}
+
+class PolicyCoverageItem {
+  PolicyCoverageItem({
+    required this.code,
+    required this.name,
+    required this.sumInsured,
+    required this.description,
+  });
+
+  final String code;
+  final String name;
+  final double? sumInsured;
+  final String? description;
+
+  factory PolicyCoverageItem.fromJson(Map<String, dynamic> json) {
+    return PolicyCoverageItem(
+      code: (json['code'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      sumInsured: (json['sumInsured'] as num?)?.toDouble(),
+      description: json['description']?.toString(),
+    );
+  }
+}
+
+class PolicyCompetitiveInsight {
+  PolicyCompetitiveInsight({
+    required this.title,
+    required this.subtitle,
+    required this.dimensions,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<PolicyInsightDimension> dimensions;
+
+  factory PolicyCompetitiveInsight.fromJson(Map<String, dynamic> json) {
+    return PolicyCompetitiveInsight(
+      title: (json['title'] ?? '').toString(),
+      subtitle: (json['subtitle'] ?? '').toString(),
+      dimensions: (json['dimensions'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(PolicyInsightDimension.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class PolicyInsightDimension {
+  PolicyInsightDimension({
+    required this.key,
+    required this.label,
+    required this.current,
+    required this.benchmark,
+    required this.comment,
+  });
+
+  final String key;
+  final String label;
+  final double current;
+  final double benchmark;
+  final String comment;
+
+  factory PolicyInsightDimension.fromJson(Map<String, dynamic> json) {
+    return PolicyInsightDimension(
+      key: (json['key'] ?? '').toString(),
+      label: (json['label'] ?? '').toString(),
+      current: (json['current'] as num? ?? 0).toDouble(),
+      benchmark: (json['benchmark'] as num? ?? 0).toDouble(),
+      comment: (json['comment'] ?? '').toString(),
     );
   }
 }
@@ -477,6 +782,26 @@ class UploadFamilyPdfResult {
   final FamilyDocument document;
   final Policy policy;
   final String? scanSource;
+}
+
+class DeleteFamilyDocumentResult {
+  DeleteFamilyDocumentResult({
+    required this.deletedDocumentId,
+    required this.deletedPolicyId,
+  });
+
+  final String deletedDocumentId;
+  final String? deletedPolicyId;
+
+  bool get hasDeletedPolicy =>
+      deletedPolicyId != null && deletedPolicyId!.isNotEmpty;
+
+  factory DeleteFamilyDocumentResult.fromJson(Map<String, dynamic> json) {
+    return DeleteFamilyDocumentResult(
+      deletedDocumentId: (json['deletedDocumentId'] ?? '').toString(),
+      deletedPolicyId: json['deletedPolicyId']?.toString(),
+    );
+  }
 }
 
 class Family {
@@ -580,6 +905,193 @@ class FamilyDocument {
       docType: (json['docType'] ?? '').toString(),
       uploadedByUserId: (json['uploadedByUserId'] ?? '').toString(),
       createdAt: (json['createdAt'] ?? '').toString(),
+    );
+  }
+}
+
+class FamilyInsight {
+  FamilyInsight({
+    required this.familyId,
+    required this.locale,
+    required this.generatedAt,
+    required this.householdScore,
+    required this.riskLevel,
+    required this.summary,
+    required this.policyCoverage,
+    required this.gaps,
+    required this.members,
+    required this.priorities,
+    required this.sources,
+  });
+
+  final String familyId;
+  final String locale;
+  final String generatedAt;
+  final int householdScore;
+  final String riskLevel;
+  final String summary;
+  final FamilyPolicyCoverage policyCoverage;
+  final List<FamilyPolicyGap> gaps;
+  final List<FamilyMemberInsight> members;
+  final List<String> priorities;
+  final List<FamilyInsightSource> sources;
+
+  factory FamilyInsight.fromJson(Map<String, dynamic> json) {
+    return FamilyInsight(
+      familyId: (json['familyId'] ?? '').toString(),
+      locale: (json['locale'] ?? '').toString(),
+      generatedAt: (json['generatedAt'] ?? '').toString(),
+      householdScore: (json['householdScore'] as num? ?? 0).toInt(),
+      riskLevel: (json['riskLevel'] ?? '').toString(),
+      summary: (json['summary'] ?? '').toString(),
+      policyCoverage: FamilyPolicyCoverage.fromJson(
+        (json['policyCoverage'] as Map<String, dynamic>?) ??
+            const <String, dynamic>{},
+      ),
+      gaps: (json['gaps'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(FamilyPolicyGap.fromJson)
+          .toList(),
+      members: (json['members'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(FamilyMemberInsight.fromJson)
+          .toList(),
+      priorities: (json['priorities'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString())
+          .toList(),
+      sources: (json['sources'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(FamilyInsightSource.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class FamilyPolicyCoverage {
+  FamilyPolicyCoverage({
+    required this.medical,
+    required this.accident,
+    required this.critical,
+    required this.life,
+  });
+
+  final bool medical;
+  final bool accident;
+  final bool critical;
+  final bool life;
+
+  factory FamilyPolicyCoverage.fromJson(Map<String, dynamic> json) {
+    return FamilyPolicyCoverage(
+      medical: json['medical'] == true,
+      accident: json['accident'] == true,
+      critical: json['critical'] == true,
+      life: json['life'] == true,
+    );
+  }
+}
+
+class FamilyPolicyGap {
+  FamilyPolicyGap({
+    required this.title,
+    required this.severity,
+    required this.description,
+  });
+
+  final String title;
+  final String severity;
+  final String description;
+
+  factory FamilyPolicyGap.fromJson(Map<String, dynamic> json) {
+    return FamilyPolicyGap(
+      title: (json['title'] ?? '').toString(),
+      severity: (json['severity'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+    );
+  }
+}
+
+class FamilyMemberInsight {
+  FamilyMemberInsight({
+    required this.memberId,
+    required this.name,
+    required this.relation,
+    required this.age,
+    required this.roleType,
+    required this.score,
+    required this.focusPoints,
+    required this.painPoints,
+    required this.recommendations,
+  });
+
+  final String memberId;
+  final String name;
+  final String relation;
+  final int? age;
+  final String roleType;
+  final int score;
+  final List<String> focusPoints;
+  final List<String> painPoints;
+  final List<FamilyMemberRecommendation> recommendations;
+
+  factory FamilyMemberInsight.fromJson(Map<String, dynamic> json) {
+    return FamilyMemberInsight(
+      memberId: (json['memberId'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      relation: (json['relation'] ?? '').toString(),
+      age: (json['age'] as num?)?.toInt(),
+      roleType: (json['roleType'] ?? '').toString(),
+      score: (json['score'] as num? ?? 0).toInt(),
+      focusPoints: (json['focusPoints'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString())
+          .toList(),
+      painPoints: (json['painPoints'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString())
+          .toList(),
+      recommendations:
+          (json['recommendations'] as List<dynamic>? ?? const <dynamic>[])
+              .whereType<Map<String, dynamic>>()
+              .map(FamilyMemberRecommendation.fromJson)
+              .toList(),
+    );
+  }
+}
+
+class FamilyMemberRecommendation {
+  FamilyMemberRecommendation({
+    required this.insuranceType,
+    required this.priority,
+    required this.reason,
+  });
+
+  final String insuranceType;
+  final String priority;
+  final String reason;
+
+  factory FamilyMemberRecommendation.fromJson(Map<String, dynamic> json) {
+    return FamilyMemberRecommendation(
+      insuranceType: (json['insuranceType'] ?? '').toString(),
+      priority: (json['priority'] ?? '').toString(),
+      reason: (json['reason'] ?? '').toString(),
+    );
+  }
+}
+
+class FamilyInsightSource {
+  FamilyInsightSource({
+    required this.title,
+    required this.url,
+    required this.note,
+  });
+
+  final String title;
+  final String url;
+  final String note;
+
+  factory FamilyInsightSource.fromJson(Map<String, dynamic> json) {
+    return FamilyInsightSource(
+      title: (json['title'] ?? '').toString(),
+      url: (json['url'] ?? '').toString(),
+      note: (json['note'] ?? '').toString(),
     );
   }
 }

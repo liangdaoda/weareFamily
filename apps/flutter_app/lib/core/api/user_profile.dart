@@ -1,19 +1,24 @@
-﻿// User identity and role metadata for API headers.
+// User identity and role metadata for API headers.
+import 'package:flutter/material.dart';
+
 enum UserRole { broker, consumer, admin }
 
 extension UserRoleHeader on UserRole {
   String get headerValue => name;
 
-  String get displayName {
+  String displayNameFor(Locale locale) {
+    final isEnglish = locale.languageCode == 'en';
     switch (this) {
       case UserRole.broker:
-        return 'B端经纪人';
+        return isEnglish ? 'Broker' : 'B端经纪人';
       case UserRole.consumer:
-        return 'C端家庭用户';
+        return isEnglish ? 'Consumer' : 'C端家庭用户';
       case UserRole.admin:
-        return '平台管理员';
+        return isEnglish ? 'Admin' : '平台管理员';
     }
   }
+
+  String get displayName => displayNameFor(const Locale('zh'));
 }
 
 class UserProfile {
@@ -82,5 +87,3 @@ class AuthUser {
     );
   }
 }
-
-

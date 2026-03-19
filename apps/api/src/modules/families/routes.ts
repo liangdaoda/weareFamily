@@ -1,15 +1,17 @@
 ﻿// Family endpoints for members and PDF documents.
 import { createReadStream } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { FastifyPluginAsync } from 'fastify';
 
 import { env } from '../../config/env';
 import { PolicyRepository } from '../policies/repository';
+import { buildPolicyAiOutput, resolveInsightLocale } from '../policies/insight';
 import { scanPolicyFromPdf } from '../policies/scan';
+import { buildFamilyInsight } from './insight';
 import { FamilyRepository } from './repository';
-import type { CreateFamilyMemberInput } from './model';
+import type { CreateFamilyMemberInput, UpdateFamilyMemberInput } from './model';
 
 function assertMemberBody(body: unknown): CreateFamilyMemberInput {
   if (!body || typeof body !== 'object') {
@@ -28,6 +30,10 @@ function assertMemberBody(body: unknown): CreateFamilyMemberInput {
     birthDate: payload.birthDate ? String(payload.birthDate) : null,
     phone: payload.phone ? String(payload.phone) : null,
   };
+}
+
+function assertMemberUpdateBody(body: unknown): UpdateFamilyMemberInput {
+  return assertMemberBody(body);
 }
 
 function sanitizeFilename(fileName: string): string {
@@ -51,6 +57,19 @@ function looksLikePolicy(scan: Awaited<ReturnType<typeof scanPolicyFromPdf>>): b
   return coreScore >= 2 && totalScore >= 3;
 }
 
+async function removeStoredFile(storagePath: string): Promise<void> {
+  const filePath = path.join(env.uploadDir, sanitizeFilename(storagePath));
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    const errno = error as NodeJS.ErrnoException;
+    if (errno.code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+}
+
 const familyRoutes: FastifyPluginAsync = async (app) => {
   const repository = new FamilyRepository();
   const policyRepository = new PolicyRepository();
@@ -69,6 +88,28 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
 
     const members = await repository.listMembers(request.userContext, familyId);
     return { total: members.length, items: members };
+  });
+
+  app.get('/:familyId/insights', async (request, reply) => {
+    const familyId = (request.params as { familyId: string }).familyId;
+    const family = await repository.ensureFamilyAccess(request.userContext, familyId);
+    if (!family) {
+      return reply.code(404).send({ message: 'Family not found.' });
+    }
+
+    const locale = resolveInsightLocale(request.headers);
+    const [members, policies] = await Promise.all([
+      repository.listMembers(request.userContext, familyId),
+      policyRepository.listPoliciesByFamily(request.userContext, familyId),
+    ]);
+
+    const insight = buildFamilyInsight({
+      familyId,
+      locale,
+      members,
+      policies,
+    });
+    return insight;
   });
 
   app.post('/:familyId/members', async (request, reply) => {
@@ -90,6 +131,59 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
       const message = error instanceof Error ? error.message : 'Invalid request body.';
       return reply.code(400).send({ message });
     }
+  });
+
+  app.patch('/:familyId/members/:memberId', async (request, reply) => {
+    const { familyId, memberId } = request.params as { familyId: string; memberId: string };
+    const family = await repository.ensureFamilyAccess(request.userContext, familyId);
+    if (!family) {
+      return reply.code(404).send({ message: 'Family not found.' });
+    }
+
+    if (request.userContext.role === 'consumer' && family.ownerUserId !== request.userContext.userId) {
+      return reply.code(403).send({ message: 'Forbidden.' });
+    }
+
+    const member = await repository.findMember(request.userContext, memberId);
+    if (!member || member.familyId !== familyId) {
+      return reply.code(404).send({ message: 'Family member not found.' });
+    }
+
+    try {
+      const input = assertMemberUpdateBody(request.body);
+      const updated = await repository.updateMember(request.userContext, memberId, input);
+      if (!updated) {
+        return reply.code(404).send({ message: 'Family member not found.' });
+      }
+      return reply.send(updated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid request body.';
+      return reply.code(400).send({ message });
+    }
+  });
+
+  app.delete('/:familyId/members/:memberId', async (request, reply) => {
+    const { familyId, memberId } = request.params as { familyId: string; memberId: string };
+    const family = await repository.ensureFamilyAccess(request.userContext, familyId);
+    if (!family) {
+      return reply.code(404).send({ message: 'Family not found.' });
+    }
+
+    if (request.userContext.role === 'consumer' && family.ownerUserId !== request.userContext.userId) {
+      return reply.code(403).send({ message: 'Forbidden.' });
+    }
+
+    const member = await repository.findMember(request.userContext, memberId);
+    if (!member || member.familyId !== familyId) {
+      return reply.code(404).send({ message: 'Family member not found.' });
+    }
+
+    const deleted = await repository.deleteMember(request.userContext, memberId);
+    if (!deleted) {
+      return reply.code(404).send({ message: 'Family member not found.' });
+    }
+
+    return reply.code(204).send();
   });
 
   app.get('/:familyId/documents', async (request, reply) => {
@@ -127,6 +221,7 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
 
     const buffer = await file.toBuffer();
     const scan = await scanPolicyFromPdf(buffer, file.filename || 'policy.pdf');
+    const locale = resolveInsightLocale(request.headers);
 
     if (!looksLikePolicy(scan)) {
       return reply.code(400).send({
@@ -144,6 +239,43 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
     const policyId = fields?.policyId?.value ? String(fields.policyId.value) : null;
     const docType = fields?.docType?.value ? String(fields.docType.value) : 'policy-form';
 
+    // Persist Chinese AI notes and return localized notes based on request locale.
+    const storageAi = buildPolicyAiOutput(
+      {
+        policyNo: scan.policyNo,
+        insurerName: scan.insurerName,
+        productName: scan.productName,
+        premium: scan.premium,
+        currency: scan.currency,
+        status: 'active',
+        startDate: scan.startDate,
+        endDate: scan.endDate,
+        aiNotes: scan.aiNotes,
+        signals: scan.signals,
+        coverageItems: scan.coverageItems,
+      },
+      'zh',
+    );
+
+    const responseAi = locale === 'zh'
+      ? storageAi
+      : buildPolicyAiOutput(
+          {
+            policyNo: scan.policyNo,
+            insurerName: scan.insurerName,
+            productName: scan.productName,
+            premium: scan.premium,
+            currency: scan.currency,
+            status: 'active',
+            startDate: scan.startDate,
+            endDate: scan.endDate,
+            aiNotes: scan.aiNotes,
+            signals: scan.signals,
+            coverageItems: scan.coverageItems,
+          },
+          locale,
+        );
+
     const createdPolicy = await policyRepository.createPolicy(request.userContext, {
       familyId,
       policyNo: scan.policyNo,
@@ -154,8 +286,12 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
       status: 'active',
       startDate: scan.startDate,
       endDate: scan.endDate,
-      aiRiskScore: scan.aiRiskScore,
-      aiNotes: scan.aiNotes,
+      aiRiskScore: storageAi.aiRiskScore,
+      aiNotes: storageAi.aiNotes,
+      aiPayload: {
+        signals: scan.signals,
+        coverageItems: storageAi.aiInsight.coverageItems,
+      },
     });
 
     const created = await repository.createDocument(request.userContext, {
@@ -170,7 +306,12 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send({
       document: created,
-      policy: createdPolicy,
+      policy: {
+        ...createdPolicy,
+        aiRiskScore: responseAi.aiRiskScore,
+        aiNotes: responseAi.aiNotes,
+        aiInsight: responseAi.aiInsight,
+      },
       scan: {
         source: scan.source,
         policyNo: scan.policyNo,
@@ -180,7 +321,59 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
         currency: scan.currency,
         startDate: scan.startDate,
         endDate: scan.endDate,
+        coverageItems: responseAi.aiInsight.coverageItems,
       },
+    });
+  });
+
+  app.delete('/:familyId/documents/:documentId', async (request, reply) => {
+    const { familyId, documentId } = request.params as { familyId: string; documentId: string };
+    const family = await repository.ensureFamilyAccess(request.userContext, familyId);
+    if (!family) {
+      return reply.code(404).send({ message: 'Family not found.' });
+    }
+
+    if (request.userContext.role === 'consumer' && family.ownerUserId !== request.userContext.userId) {
+      return reply.code(403).send({ message: 'Forbidden.' });
+    }
+
+    const document = await repository.findDocument(request.userContext, documentId);
+    if (!document || document.familyId !== familyId) {
+      return reply.code(404).send({ message: 'Document not found.' });
+    }
+
+    const deleted = await repository.deleteDocument(request.userContext, documentId);
+    if (!deleted) {
+      return reply.code(404).send({ message: 'Document not found.' });
+    }
+
+    let deletedPolicyId: string | null = null;
+    if (document.policyId) {
+      const remainingDocs = await repository.countDocumentsByPolicy(
+        request.userContext,
+        familyId,
+        document.policyId,
+      );
+      if (remainingDocs === 0) {
+        const deletedPolicy = await policyRepository.deletePolicyByFamily(request.userContext, {
+          familyId,
+          policyId: document.policyId,
+        });
+        if (deletedPolicy) {
+          deletedPolicyId = document.policyId;
+        }
+      }
+    }
+
+    try {
+      await removeStoredFile(document.storagePath);
+    } catch (error) {
+      request.log.warn({ error, documentId }, 'Failed to delete stored document file.');
+    }
+
+    return reply.send({
+      deletedDocumentId: documentId,
+      deletedPolicyId,
     });
   });
 

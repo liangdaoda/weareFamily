@@ -1,23 +1,34 @@
-﻿// Authentication screen with role selection and login.
+// Authentication screen with Cupertino-style role selection and login.
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:wearefamily_app/config/app_config.dart';
 import 'package:wearefamily_app/core/api/api_client.dart';
 import 'package:wearefamily_app/core/api/user_profile.dart';
+import 'package:wearefamily_app/core/i18n/locale_text.dart';
 import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
 import 'package:wearefamily_app/shared/widgets/decorative_background.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
+import 'package:wearefamily_app/shared/widgets/preferences_sheet.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
     super.key,
     required this.apiClient,
     required this.onAuthenticated,
+    required this.locale,
+    required this.themeMode,
+    required this.onLocaleChanged,
+    required this.onThemeModeChanged,
   });
 
   final ApiClient apiClient;
   final ValueChanged<AuthSession> onAuthenticated;
+  final Locale locale;
+  final ThemeMode themeMode;
+  final ValueChanged<Locale> onLocaleChanged;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -29,6 +40,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController(text: 'broker@example.com');
   final _passwordController = TextEditingController(text: 'demo1234');
   final _confirmController = TextEditingController();
+
   UserRole _role = UserRole.broker;
   bool _isRegister = false;
   bool _loading = false;
@@ -41,6 +53,16 @@ class _AuthScreenState extends State<AuthScreen> {
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
+  }
+
+  Future<void> _openPreferences() {
+    return PreferencesSheet.show(
+      context,
+      locale: widget.locale,
+      themeMode: widget.themeMode,
+      onLocaleChanged: widget.onLocaleChanged,
+      onThemeModeChanged: widget.onThemeModeChanged,
+    );
   }
 
   Future<void> _handleLogin() async {
@@ -118,7 +140,7 @@ class _AuthScreenState extends State<AuthScreen> {
         provider: 'demo',
         subject: 'demo-${_role.name}',
         email: _emailController.text.trim(),
-        name: _role == UserRole.broker ? '演示经纪人' : '演示家庭用户',
+        name: _role == UserRole.broker ? 'Demo Broker' : 'Demo Consumer',
         role: _role,
         tenantId: AppConfig.tenantId,
       );
@@ -139,8 +161,9 @@ class _AuthScreenState extends State<AuthScreen> {
   void _switchRole(UserRole role) {
     setState(() {
       _role = role;
-      _emailController.text =
-          role == UserRole.broker ? 'broker@example.com' : 'consumer@example.com';
+      _emailController.text = role == UserRole.broker
+          ? 'broker@example.com'
+          : 'consumer@example.com';
     });
   }
 
@@ -161,26 +184,43 @@ class _AuthScreenState extends State<AuthScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth > 900;
-              final horizontalPadding = isWide ? 120.0 : 24.0;
+              final horizontalPadding = isWide ? 96.0 : 18.0;
 
               return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 36),
+                padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding, vertical: 26),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: CupertinoButton(
+                        minimumSize: const Size(30, 30),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: _openPreferences,
+                        child: const Icon(CupertinoIcons.settings_solid,
+                            color: Colors.white70, size: 20),
+                      ),
+                    ),
                     _HeroHeader(isWide: isWide),
                     const SizedBox(height: AppSpacing.xl),
                     GlassCard(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.all(18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isRegister ? '创建新账号' : '欢迎回来',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+                            isRegister
+                                ? context.tr('创建新账户', 'Create Account')
+                                : context.tr('欢迎回来', 'Welcome Back'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(color: Colors.white),
                           ),
                           const SizedBox(height: AppSpacing.sm),
-                          _AuthModeToggle(isRegister: isRegister, onChanged: _switchMode),
+                          _AuthModeToggle(
+                              isRegister: isRegister, onChanged: _switchMode),
                           const SizedBox(height: AppSpacing.sm),
                           _RoleToggle(role: _role, onChanged: _switchRole),
                           const SizedBox(height: AppSpacing.md),
@@ -191,33 +231,36 @@ class _AuthScreenState extends State<AuthScreen> {
                                 if (isRegister) ...[
                                   _InputField(
                                     controller: _nameController,
-                                    label: '姓名',
-                                    icon: Icons.badge_outlined,
+                                    label: context.tr('姓名', 'Name'),
+                                    icon: CupertinoIcons.person,
                                     validator: _validateName,
                                   ),
                                   const SizedBox(height: AppSpacing.sm),
                                 ],
                                 _InputField(
                                   controller: _emailController,
-                                  label: '邮箱',
-                                  icon: Icons.alternate_email,
+                                  label: context.tr('邮箱', 'Email'),
+                                  icon: CupertinoIcons.mail,
                                   keyboardType: TextInputType.emailAddress,
                                   validator: _validateEmail,
                                 ),
                                 const SizedBox(height: AppSpacing.sm),
                                 _InputField(
                                   controller: _passwordController,
-                                  label: '密码',
-                                  icon: Icons.lock_outline,
+                                  label: context.tr('密码', 'Password'),
+                                  icon: CupertinoIcons.lock,
                                   obscureText: true,
-                                  validator: isRegister ? _validateStrongPassword : _validatePassword,
+                                  validator: isRegister
+                                      ? _validateStrongPassword
+                                      : _validatePassword,
                                 ),
                                 if (isRegister) ...[
                                   const SizedBox(height: AppSpacing.sm),
                                   _InputField(
                                     controller: _confirmController,
-                                    label: '确认密码',
-                                    icon: Icons.lock_reset_outlined,
+                                    label:
+                                        context.tr('确认密码', 'Confirm Password'),
+                                    icon: CupertinoIcons.lock_rotation,
                                     obscureText: true,
                                     validator: _validateConfirmPassword,
                                   ),
@@ -227,62 +270,63 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                           const SizedBox(height: AppSpacing.md),
                           AnimatedSwitcher(
-                            duration: 200.ms,
+                            duration: 180.ms,
                             child: _error == null
                                 ? const SizedBox.shrink()
                                 : Text(
                                     _error!,
                                     key: ValueKey(_error),
-                                    style: const TextStyle(color: AppColors.rose),
+                                    style:
+                                        const TextStyle(color: AppColors.rose),
                                   ),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton(
+                                child: CupertinoButton.filled(
                                   onPressed: _loading
                                       ? null
                                       : isRegister
                                           ? _handleRegister
                                           : _handleLogin,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.accent,
-                                    foregroundColor: AppColors.ink,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 11),
+                                  borderRadius: BorderRadius.circular(9),
                                   child: _loading
-                                      ? const SizedBox(
-                                          height: 18,
-                                          width: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : Text(isRegister ? '注册并进入' : '登录'),
+                                      ? const CupertinoActivityIndicator(
+                                          radius: 9, color: AppColors.ink)
+                                      : Text(
+                                          isRegister
+                                              ? context.tr(
+                                                  '注册并进入', 'Register & Enter')
+                                              : context.tr('登录', 'Sign In'),
+                                          style: const TextStyle(
+                                            color: AppColors.ink,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                 ),
                               ),
                               if (!isRegister) ...[
                                 const SizedBox(width: AppSpacing.sm),
-                                OutlinedButton(
+                                CupertinoButton(
                                   onPressed: _loading ? null : _handleSso,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    side: BorderSide(color: Colors.white.withOpacity(0.3)),
-                                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 11),
+                                  borderRadius: BorderRadius.circular(9),
+                                  color: Colors.white.withValues(alpha: 0.14),
+                                  child: Text(
+                                    context.tr('演示SSO', 'Demo SSO'),
+                                    style: const TextStyle(color: Colors.white),
                                   ),
-                                  child: const Text('演示SSO'),
                                 ),
                               ],
                             ],
                           ),
                           const SizedBox(height: AppSpacing.md),
                           Text(
-                            '租户: ${AppConfig.tenantId} · API: ${AppConfig.apiBaseUrl}',
+                            '${context.tr('租户', 'Tenant')}: ${AppConfig.tenantId} · API: ${AppConfig.apiBaseUrl}',
                             style: Theme.of(context)
                                 .textTheme
                                 .labelLarge
@@ -290,7 +334,10 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ],
                       ),
-                    ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.2, curve: Curves.easeOutCubic),
+                    )
+                        .animate()
+                        .fadeIn(duration: 520.ms)
+                        .slideY(begin: 0.12, curve: Curves.easeOutCubic),
                   ],
                 ),
               );
@@ -303,56 +350,58 @@ class _AuthScreenState extends State<AuthScreen> {
 
   String? _validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return '邮箱不能为空';
+      return context.tr('邮箱不能为空', 'Email is required');
     }
     final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     if (!regex.hasMatch(value.trim())) {
-      return '邮箱格式不正确';
+      return context.tr('邮箱格式不正确', 'Invalid email format');
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return '密码不能为空';
+      return context.tr('密码不能为空', 'Password is required');
     }
     if (value.trim().length < 6) {
-      return '密码至少6位';
+      return context.tr('密码至少6位', 'Password must be at least 6 chars');
     }
     return null;
   }
 
   String? _validateStrongPassword(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return '密码不能为空';
+      return context.tr('密码不能为空', 'Password is required');
     }
     final trimmed = value.trim();
     if (trimmed.length < 8) {
-      return '密码至少8位';
+      return context.tr('密码至少8位', 'Password must be at least 8 chars');
     }
-    if (!RegExp(r'[A-Za-z]').hasMatch(trimmed) || !RegExp(r'\d').hasMatch(trimmed)) {
-      return '密码需包含字母和数字';
+    if (!RegExp(r'[A-Za-z]').hasMatch(trimmed) ||
+        !RegExp(r'\d').hasMatch(trimmed)) {
+      return context.tr(
+          '密码需包含字母和数字', 'Password must include letters and numbers');
     }
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return '请再次输入密码';
+      return context.tr('请再次输入密码', 'Please confirm password');
     }
     if (value.trim() != _passwordController.text.trim()) {
-      return '两次输入的密码不一致';
+      return context.tr('两次输入密码不一致', 'Passwords do not match');
     }
     return null;
   }
 
   String? _validateName(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return '姓名不能为空';
+      return context.tr('姓名不能为空', 'Name is required');
     }
     final trimmed = value.trim();
     if (trimmed.length < 2 || trimmed.length > 20) {
-      return '姓名长度需为2-20个字符';
+      return context.tr('姓名长度需为2-20个字符', 'Name must be 2-20 characters');
     }
     return null;
   }
@@ -365,23 +414,30 @@ class _HeroHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(color: Colors.white);
+    final titleStyle =
+        Theme.of(context).textTheme.displayLarge?.copyWith(color: Colors.white);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '家庭保单AI管家',
+          context.tr('家庭保单AI管家', 'Family Policy AI Assistant'),
           style: titleStyle,
-        ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.15),
+        ).animate().fadeIn(duration: 520.ms).slideY(begin: 0.1),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
           width: isWide ? 520 : double.infinity,
           child: Text(
-            '面向经纪人与家庭的保障中枢，实时洞察风险与续期节奏。',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70),
+            context.tr(
+              '面向经纪人与家庭用户的跨端保障平台，集中查看风险、到期与家庭保障结构。',
+              'A cross-platform protection hub for brokers and families.',
+            ),
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(color: Colors.white70),
           ),
-        ).animate().fadeIn(duration: 600.ms, delay: 120.ms),
+        ).animate().fadeIn(duration: 520.ms, delay: 120.ms),
       ],
     );
   }
@@ -395,19 +451,29 @@ class _RoleToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.sm,
-      children: UserRole.values.take(2).map((option) {
-        final selected = option == role;
-        return ChoiceChip(
-          label: Text(option.displayName),
-          selected: selected,
-          selectedColor: AppColors.mint,
-          labelStyle: TextStyle(color: selected ? AppColors.ink : Colors.white70),
-          backgroundColor: Colors.white.withOpacity(0.08),
-          onSelected: (_) => onChanged(option),
-        );
-      }).toList(),
+    final locale = Localizations.localeOf(context);
+
+    return CupertinoSlidingSegmentedControl<UserRole>(
+      groupValue: role,
+      backgroundColor: Colors.white.withValues(alpha: 0.1),
+      thumbColor: Colors.white.withValues(alpha: 0.25),
+      children: {
+        UserRole.broker: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(UserRole.broker.displayNameFor(locale),
+              style: const TextStyle(color: Colors.white)),
+        ),
+        UserRole.consumer: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(UserRole.consumer.displayNameFor(locale),
+              style: const TextStyle(color: Colors.white)),
+        ),
+      },
+      onValueChanged: (value) {
+        if (value != null) {
+          onChanged(value);
+        }
+      },
     );
   }
 }
@@ -420,63 +486,33 @@ class _AuthModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          _ModeChip(
-            label: '登录',
-            selected: !isRegister,
-            onTap: () => onChanged(false),
-          ),
-          _ModeChip(
-            label: '注册',
-            selected: isRegister,
-            onTap: () => onChanged(true),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModeChip extends StatelessWidget {
-  const _ModeChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: 200.ms,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.mint : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-          ),
+    return CupertinoSlidingSegmentedControl<bool>(
+      groupValue: isRegister,
+      backgroundColor: Colors.white.withValues(alpha: 0.1),
+      thumbColor: AppColors.mint.withValues(alpha: 0.92),
+      children: {
+        false: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: selected ? AppColors.ink : Colors.white70,
-              fontWeight: FontWeight.w600,
-            ),
+            context.tr('登录', 'Login'),
+            style: const TextStyle(
+                color: AppColors.ink, fontWeight: FontWeight.w700),
           ),
         ),
-      ),
+        true: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(
+            context.tr('注册', 'Register'),
+            style: const TextStyle(
+                color: AppColors.ink, fontWeight: FontWeight.w700),
+          ),
+        ),
+      },
+      onValueChanged: (value) {
+        if (value != null) {
+          onChanged(value);
+        }
+      },
     );
   }
 }
@@ -509,12 +545,21 @@ class _InputField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white70),
-        prefixIcon: Icon(icon, color: Colors.white70),
+        prefixIcon: Icon(icon, color: Colors.white70, size: 18),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.08),
+        fillColor: Colors.white.withValues(alpha: 0.1),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(9),
           borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(9),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(9),
+          borderSide: BorderSide(
+              color: AppColors.accent.withValues(alpha: 0.8), width: 1.2),
         ),
       ),
     );

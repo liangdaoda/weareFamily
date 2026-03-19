@@ -18,6 +18,15 @@ export function buildApp(): FastifyInstance {
 
   app.register(cors, {
     origin: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-User-Id',
+      'X-User-Role',
+      'X-Tenant-Id',
+      'X-Lang',
+    ],
   });
   app.register(multipart, {
     limits: {

@@ -2,6 +2,12 @@
 import pdfParse from 'pdf-parse';
 
 import { env } from '../../config/env';
+import {
+  extractPolicySignalsFromText,
+  mergeSignals,
+  type PolicyCoverageItem,
+  type PolicyFeatureSignals,
+} from './insight';
 
 export interface ScanPolicyResult {
   policyNo: string;
@@ -13,6 +19,8 @@ export interface ScanPolicyResult {
   endDate: string | null;
   aiRiskScore: number | null;
   aiNotes: string | null;
+  signals: PolicyFeatureSignals;
+  coverageItems: PolicyCoverageItem[];
   source: 'external' | 'heuristic';
 }
 
@@ -26,6 +34,8 @@ interface PartialScan {
   endDate?: string | null;
   aiRiskScore?: number | null;
   aiNotes?: string | null;
+  signals?: Partial<PolicyFeatureSignals>;
+  coverageItems?: PolicyCoverageItem[];
 }
 
 export async function scanPolicyFromPdf(buffer: Buffer, fileName: string): Promise<ScanPolicyResult> {
@@ -97,6 +107,21 @@ function normalizeExternal(payload: Record<string, unknown>): PartialScan {
     ),
     aiRiskScore: pickNumberOrNull(obj, ['aiRiskScore', 'riskScore', 'risk_score', '风险评分']),
     aiNotes: pickString(obj, ['aiNotes', 'notes', 'analysis', 'summary', '风险分析', '建议']),
+    signals: {
+      sumInsured: pickAmountOrNull(obj, ['sumInsured', 'sum_insured', 'coverageAmount', '保额', '保险金额']),
+      hasMedicalCoverage: pickBooleanOrNull(obj, ['hasMedicalCoverage', 'medicalCoverage', '医疗保障']),
+      hasCriticalIllnessCoverage: pickBooleanOrNull(
+        obj,
+        ['hasCriticalIllnessCoverage', 'criticalIllnessCoverage', '重疾保障'],
+      ),
+      hasSuddenDeathCoverage: pickBooleanOrNull(obj, ['hasSuddenDeathCoverage', 'suddenDeathCoverage', '猝死保障']),
+      hasHospitalizationAllowance: pickBooleanOrNull(
+        obj,
+        ['hasHospitalizationAllowance', 'hospitalizationAllowance', '住院津贴'],
+      ),
+      hasOutpatientCoverage: pickBooleanOrNull(obj, ['hasOutpatientCoverage', 'outpatientCoverage', '门诊保障']),
+    },
+    coverageItems: pickCoverageItems(obj),
   };
 }
 
@@ -125,6 +150,8 @@ function mergeScan(base: PartialScan, override: PartialScan, source: ScanPolicyR
   const endDate = normalizeNullableDateString(override.endDate ?? base.endDate);
   const aiRiskScore = override.aiRiskScore ?? base.aiRiskScore ?? null;
   const aiNotes = override.aiNotes ?? base.aiNotes ?? `AI扫描来源: ${source}`;
+  const signals = mergeSignals(base.signals, override.signals);
+  const coverageItems = mergeCoverageItems(base.coverageItems, override.coverageItems, signals);
 
   return {
     policyNo,
@@ -136,12 +163,16 @@ function mergeScan(base: PartialScan, override: PartialScan, source: ScanPolicyR
     endDate,
     aiRiskScore,
     aiNotes,
+    signals,
+    coverageItems,
     source,
   };
 }
 
 function heuristicScan(text: string, fileName: string): PartialScan {
   const normalized = normalizeText(text);
+  const signals = extractPolicySignalsFromText(normalized);
+  const coverageItems = extractCoverageItemsFromText(normalized, signals);
 
   const period = matchDatePeriod(normalized);
   const policyNo =
@@ -151,11 +182,15 @@ function heuristicScan(text: string, fileName: string): PartialScan {
 
   const insurerName =
     matchFirst(normalized, [
-      /(?:保险公司|承保公司|保险人|Insurer)\s*[:：]?\s*([^\n\r]{2,50})/i,
-    ]) ?? matchFirst(normalized, [/([^\n\r]{2,40}保险(?:股份)?有限公司)/]);
+      /(?:公司名称)\s*[:：]?\s*([^\n\r]{2,80})/i,
+      /(?:保险公司|承保公司|Insurer)\s*[:：]?\s*([^\n\r]{2,80})/i,
+      /(?<!被)保险人(?:公司名称)?\s*[:：]?\s*([^\n\r]{2,80})/i,
+    ]) ??
+    matchFirst(normalized, [/([^\n\r]{2,60}保险(?:股份)?有限公司(?:[^\n\r]{0,20}分公司)?)/]);
 
   const productName = matchFirst(normalized, [
     /(?:产品名称|险种名称|保险产品|Product\s*Name)\s*[:：]?\s*([^\n\r]{2,80})/i,
+    /([^\n\r]{2,80}保险单(?:（电子保单）)?)/,
   ]);
 
   const premiumRaw = matchFirst(normalized, [
@@ -187,6 +222,8 @@ function heuristicScan(text: string, fileName: string): PartialScan {
     currency: detectCurrency(normalized),
     startDate,
     endDate,
+    signals,
+    coverageItems,
     aiNotes: `规则抽取(${fileName})`,
   };
 }
@@ -292,6 +329,185 @@ function normalizeNullableDateString(value: string | null | undefined): string |
   return normalizeDateString(value) ?? null;
 }
 
+function mergeCoverageItems(
+  base: PolicyCoverageItem[] | undefined,
+  override: PolicyCoverageItem[] | undefined,
+  signals: PolicyFeatureSignals,
+): PolicyCoverageItem[] {
+  const preferred = (override && override.length > 0) ? override : base ?? [];
+  const normalized = preferred
+    .map(normalizeCoverageItem)
+    .filter((item): item is PolicyCoverageItem => item !== null);
+  if (normalized.length > 0) {
+    return dedupeCoverageItems(normalized).slice(0, 24);
+  }
+  return buildFallbackCoverageItems(signals);
+}
+
+function extractCoverageItemsFromText(text: string, signals: PolicyFeatureSignals): PolicyCoverageItem[] {
+  const patterns = [
+    /([^\n\r]{2,40}?(?:责任|保障|给付|保险金|津贴|补偿|补助))\s*[:：]?\s*(?:人民币|rmb|cny|¥|￥)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(万)?/gi,
+    /([^\n\r]{2,40}?(?:保额|限额))\s*[:：]?\s*(?:人民币|rmb|cny|¥|￥)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(万)?/gi,
+  ];
+  const items: PolicyCoverageItem[] = [];
+
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    let match = pattern.exec(text);
+    while (match) {
+      const name = cleanCoverageName(match[1]);
+      if (name && !looksLikeNoiseCoverageName(name)) {
+        const numeric = Number((match[2] ?? '').replace(/,/g, ''));
+        const multiplier = match[3] ? 10000 : 1;
+        items.push({
+          code: normalizeCoverageCode(name),
+          name,
+          sumInsured: Number.isFinite(numeric) ? numeric * multiplier : null,
+          description: null,
+        });
+      }
+      match = pattern.exec(text);
+    }
+  }
+
+  if (items.length > 0) {
+    return dedupeCoverageItems(items).slice(0, 24);
+  }
+  return buildFallbackCoverageItems(signals);
+}
+
+function pickCoverageItems(obj: Record<string, unknown>): PolicyCoverageItem[] | undefined {
+  const keys = ['coverageItems', 'coverages', 'coverage_items', 'benefits', '保障项目', '保障责任'];
+  for (const key of keys) {
+    const value = obj[key];
+    if (!Array.isArray(value)) {
+      continue;
+    }
+
+    const items = value
+      .map((item) => normalizeCoverageItem(item))
+      .filter((item): item is PolicyCoverageItem => item !== null);
+    if (items.length > 0) {
+      return dedupeCoverageItems(items).slice(0, 24);
+    }
+  }
+  return undefined;
+}
+
+function normalizeCoverageItem(value: unknown): PolicyCoverageItem | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const name = pickString(raw, ['name', 'title', 'item', 'coverageName', '保障项目', '保障责任', '责任名称']);
+  if (!name) {
+    return null;
+  }
+
+  const sumInsured = pickAmountOrNull(raw, ['sumInsured', 'sum_insured', 'amount', 'limit', '保额', '限额']) ?? null;
+  const description = pickString(raw, ['description', 'desc', 'remark', 'note', '说明', '备注']) ?? null;
+
+  return {
+    code: normalizeCoverageCode(name),
+    name: cleanCoverageName(name),
+    sumInsured,
+    description,
+  };
+}
+
+function buildFallbackCoverageItems(signals: PolicyFeatureSignals): PolicyCoverageItem[] {
+  const items: PolicyCoverageItem[] = [];
+  if (signals.sumInsured !== null) {
+    items.push({
+      code: 'core_sum_insured',
+      name: '基础保额',
+      sumInsured: signals.sumInsured,
+      description: null,
+    });
+  }
+  if (signals.hasMedicalCoverage === true) {
+    items.push({
+      code: 'medical_coverage',
+      name: '住院医疗责任',
+      sumInsured: signals.sumInsured,
+      description: null,
+    });
+  }
+  if (signals.hasOutpatientCoverage === true) {
+    items.push({
+      code: 'outpatient_coverage',
+      name: '门急诊责任',
+      sumInsured: null,
+      description: null,
+    });
+  }
+  if (signals.hasHospitalizationAllowance === true) {
+    items.push({
+      code: 'hospital_allowance',
+      name: '住院津贴责任',
+      sumInsured: null,
+      description: null,
+    });
+  }
+  if (signals.hasCriticalIllnessCoverage === true) {
+    items.push({
+      code: 'critical_coverage',
+      name: '重大疾病责任',
+      sumInsured: signals.sumInsured,
+      description: null,
+    });
+  }
+  if (signals.hasSuddenDeathCoverage === true) {
+    items.push({
+      code: 'sudden_death_coverage',
+      name: '猝死责任',
+      sumInsured: signals.sumInsured,
+      description: null,
+    });
+  }
+  return items;
+}
+
+function dedupeCoverageItems(items: PolicyCoverageItem[]): PolicyCoverageItem[] {
+  const map = new Map<string, PolicyCoverageItem>();
+  for (const item of items) {
+    const key = item.code || normalizeCoverageCode(item.name);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, item);
+      continue;
+    }
+
+    map.set(key, {
+      ...existing,
+      sumInsured: existing.sumInsured ?? item.sumInsured,
+      description: existing.description ?? item.description,
+    });
+  }
+  return Array.from(map.values());
+}
+
+function cleanCoverageName(value: string): string {
+  return value
+    .replace(/[;；。]+$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function normalizeCoverageCode(name: string): string {
+  return normalizeText(name)
+    .replace(/[^\p{L}\p{N}]+/gu, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48);
+}
+
+function looksLikeNoiseCoverageName(name: string): boolean {
+  const normalized = normalizeText(name);
+  const blocked = ['保费', '合计', '总计', '签章', '投保人', '被保险人', '保险期间'];
+  return blocked.some((item) => normalized.includes(item));
+}
+
 function pickString(obj: Record<string, unknown>, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = obj[key];
@@ -329,4 +545,47 @@ function pickNumberOrNull(obj: Record<string, unknown>, keys: string[]): number 
     return undefined;
   }
   return num;
+}
+
+function pickAmountOrNull(obj: Record<string, unknown>, keys: string[]): number | null | undefined {
+  for (const key of keys) {
+    const value = obj[key];
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    const raw = String(value).trim();
+    if (raw.length === 0) {
+      continue;
+    }
+
+    const normalized = raw.replace(/,/g, '');
+    const multiplier = normalized.includes('万') ? 10000 : 1;
+    const numeric = Number(normalized.replace(/[^\d.]/g, ''));
+    if (!Number.isNaN(numeric) && numeric > 0) {
+      return numeric * multiplier;
+    }
+  }
+  return undefined;
+}
+
+function pickBooleanOrNull(obj: Record<string, unknown>, keys: string[]): boolean | null | undefined {
+  for (const key of keys) {
+    const value = obj[key];
+    if (value === undefined || value === null) {
+      continue;
+    }
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    const normalized = String(value).trim().toLowerCase();
+    if (['1', 'true', 'yes', 'y', '是', '有', '包含', '覆盖'].includes(normalized)) {
+      return true;
+    }
+    if (['0', 'false', 'no', 'n', '否', '无', '不包含', '不覆盖'].includes(normalized)) {
+      return false;
+    }
+  }
+  return undefined;
 }

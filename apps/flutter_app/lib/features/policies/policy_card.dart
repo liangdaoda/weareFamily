@@ -1,3 +1,1 @@
-﻿// Deprecated: moved to presentation/ structure.
-
-
+// Deprecated: moved to presentation/ structure.

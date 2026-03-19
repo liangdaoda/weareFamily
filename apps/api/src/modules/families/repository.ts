@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 
 import { db } from '../../db/knex';
 import type { UserContext } from '../../types/user-context';
-import type { CreateFamilyMemberInput, Family, FamilyDocument, FamilyMember } from './model';
+import type {
+  CreateFamilyMemberInput,
+  Family,
+  FamilyDocument,
+  FamilyMember,
+  UpdateFamilyMemberInput,
+} from './model';
 
 interface FamilyRow {
   id: string;
@@ -138,6 +144,42 @@ export class FamilyRepository {
     return mapMember(payload);
   }
 
+  async findMember(ctx: UserContext, memberId: string): Promise<FamilyMember | null> {
+    const row = await db<MemberRow>('family_members')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('id', memberId)
+      .first();
+    return row ? mapMember(row) : null;
+  }
+
+  async updateMember(ctx: UserContext, memberId: string, input: UpdateFamilyMemberInput): Promise<FamilyMember | null> {
+    await db<MemberRow>('family_members')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('id', memberId)
+      .update({
+        name: input.name,
+        relation: input.relation,
+        gender: input.gender ?? null,
+        birth_date: input.birthDate ?? null,
+        phone: input.phone ?? null,
+      });
+
+    const row = await db<MemberRow>('family_members')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('id', memberId)
+      .first();
+    return row ? mapMember(row) : null;
+  }
+
+  // Delete one member under current tenant scope.
+  async deleteMember(ctx: UserContext, memberId: string): Promise<boolean> {
+    const deleted = await db<MemberRow>('family_members')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('id', memberId)
+      .delete();
+    return deleted > 0;
+  }
+
   async listDocuments(ctx: UserContext, familyId: string): Promise<FamilyDocument[]> {
     const rows = await db<DocumentRow>('policy_documents')
       .where('tenant_id', ctx.tenantId)
@@ -179,5 +221,23 @@ export class FamilyRepository {
       .andWhere('id', documentId)
       .first();
     return row ? mapDocument(row) : null;
+  }
+
+  async countDocumentsByPolicy(ctx: UserContext, familyId: string, policyId: string): Promise<number> {
+    const row = await db<DocumentRow>('policy_documents')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('family_id', familyId)
+      .andWhere('policy_id', policyId)
+      .count<{ total: number | string }>({ total: 'id' })
+      .first();
+    return Number(row?.total ?? 0);
+  }
+
+  async deleteDocument(ctx: UserContext, documentId: string): Promise<boolean> {
+    const deleted = await db<DocumentRow>('policy_documents')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('id', documentId)
+      .delete();
+    return deleted > 0;
   }
 }

@@ -107,10 +107,26 @@ async function createPoliciesTable(): Promise<void> {
     table.date('end_date').nullable();
     table.decimal('ai_risk_score', 5, 2).nullable();
     table.text('ai_notes').nullable();
+    table.text('ai_payload').nullable();
     table.string('created_by_user_id', 36).notNullable().index();
     table.timestamp('created_at').notNullable().defaultTo(db.fn.now());
     table.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
   });
+}
+
+// Ensure policy AI payload column exists for richer extracted coverage metadata.
+async function ensurePolicyColumns(): Promise<void> {
+  const exists = await db.schema.hasTable('policies');
+  if (!exists) {
+    return;
+  }
+
+  const hasAiPayload = await db.schema.hasColumn('policies', 'ai_payload');
+  if (!hasAiPayload) {
+    await db.schema.alterTable('policies', (table) => {
+      table.text('ai_payload').nullable();
+    });
+  }
 }
 
 // Family member table for household profiles.
@@ -287,6 +303,7 @@ export async function runMigrations(): Promise<void> {
   await ensureUserColumns();
   await createFamiliesTable();
   await createPoliciesTable();
+  await ensurePolicyColumns();
   await createFamilyMembersTable();
   await createPolicyDocumentsTable();
   await seedDemoData();
