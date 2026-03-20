@@ -207,7 +207,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(context.tr('鍒犻櫎瀹跺涵鎴愬憳', 'Delete family member')),
+        title: Text(context.tr('删除家庭成员', 'Delete family member')),
         content: Text(
           context.tr(
             '确认删除该家庭成员？删除后将无法恢复。',
@@ -217,10 +217,10 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(context.tr('鍙栨秷', 'Cancel'))),
+              child: Text(context.tr('取消', 'Cancel'))),
           FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text(context.tr('鍒犻櫎', 'Delete'))),
+              child: Text(context.tr('删除', 'Delete'))),
         ],
       ),
     );
@@ -247,7 +247,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(context.tr('鍒犻櫎淇濆崟琛ㄥ崟', 'Delete policy PDF')),
+        title: Text(context.tr('删除保单表单', 'Delete policy PDF')),
         content: Text(
           context.tr(
             '确认删除该PDF表单？若它是唯一关联来源，会同步删除关联保单。',
@@ -257,11 +257,11 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(context.tr('鍙栨秷', 'Cancel')),
+            child: Text(context.tr('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(context.tr('鍒犻櫎', 'Delete')),
+            child: Text(context.tr('删除', 'Delete')),
           ),
         ],
       ),
@@ -425,7 +425,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
     }
     if (_families.isEmpty) {
       return Center(
-          child: Text(context.tr('鏆傛棤瀹跺涵鏁版嵁', 'No family data'),
+          child: Text(context.tr('暂无家庭数据', 'No family data'),
               style: const TextStyle(color: Colors.white70)));
     }
 
@@ -443,7 +443,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(
-                    child: Text(context.tr('瀹跺涵涓績', 'Family center'),
+                    child: Text(context.tr('家庭中心', 'Family center'),
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
@@ -455,7 +455,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
               DropdownButtonFormField<String>(
                 initialValue: selectedFamily.id,
                 decoration: InputDecoration(
-                    labelText: context.tr('閫夋嫨瀹跺涵', 'Select family')),
+                    labelText: context.tr('选择家庭', 'Select family')),
                 items: _families
                     .map((f) => DropdownMenuItem<String>(
                         value: f.id, child: Text(f.name)))
@@ -480,7 +480,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
               Row(children: [
                 Expanded(
                     child: Text(
-                        '${context.tr('瀹跺涵鎴愬憳', 'Members')} (${_members.length})',
+                        '${context.tr('家庭成员', 'Members')} (${_members.length})',
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
@@ -489,11 +489,11 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                     onPressed:
                         _loadingDetails ? null : () => _addOrEditMember(),
                     icon: const Icon(Icons.person_add, size: 16),
-                    label: Text(context.tr('鏂板鎴愬憳', 'Add member'))),
+                    label: Text(context.tr('新增成员', 'Add member'))),
               ]),
               const SizedBox(height: AppSpacing.md),
               if (_members.isEmpty)
-                Text(context.tr('鏆傛棤鎴愬憳', 'No members'),
+                Text(context.tr('暂无成员', 'No members'),
                     style: const TextStyle(color: Colors.white70))
               else
                 ..._members.map((m) {
@@ -521,7 +521,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
               Row(children: [
                 Expanded(
                     child: Text(
-                        '${context.tr('淇濆崟PDF', 'Policy PDFs')} (${_documents.length})',
+                        '${context.tr('保单PDF', 'Policy PDFs')} (${_documents.length})',
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
@@ -529,11 +529,11 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                 FilledButton.icon(
                     onPressed: _loadingDetails ? null : _uploadPdf,
                     icon: const Icon(Icons.upload_file, size: 16),
-                    label: Text(context.tr('瀵煎叆PDF', 'Import PDF'))),
+                    label: Text(context.tr('导入PDF', 'Import PDF'))),
               ]),
               const SizedBox(height: AppSpacing.md),
               if (_documents.isEmpty)
-                Text(context.tr('鏆傛棤淇濆崟PDF', 'No policy PDFs'),
+                Text(context.tr('暂无保单PDF', 'No policy PDFs'),
                     style: const TextStyle(color: Colors.white70))
               else
                 ..._documents.map((d) {
@@ -580,7 +580,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                           icon: Icons.delete_outline,
                           onPressed:
                               _loadingDetails ? null : () => _deleteDocument(d),
-                          tooltip: context.tr('鍒犻櫎琛ㄥ崟', 'Delete PDF'),
+                          tooltip: context.tr('删除表单', 'Delete PDF'),
                           color: AppColors.rose,
                         ),
                       ],
@@ -660,9 +660,9 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
       case 'female':
         return context.tr('女', 'Female');
       case 'other':
-        return context.tr('鍏朵粬', 'Other');
+        return context.tr('其他', 'Other');
       case 'unknown':
-        return context.tr('鏈煡', 'Unknown');
+        return context.tr('未知', 'Unknown');
       default:
         return value;
     }
@@ -682,7 +682,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
     return AlertDialog(
       title: Text(
         context.tr(
-          member == null ? '娣诲姞瀹跺涵鎴愬憳' : '缂栬緫瀹跺涵鎴愬憳',
+          member == null ? '添加家庭成员' : '编辑家庭成员',
           member == null ? 'Add family member' : 'Edit family member',
         ),
       ),
@@ -693,11 +693,11 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
           children: [
             TextFormField(
               controller: _nameController,
-              decoration: InputDecoration(labelText: context.tr('濮撳悕', 'Name')),
+              decoration: InputDecoration(labelText: context.tr('姓名', 'Name')),
               validator: (value) {
                 final text = value?.trim() ?? '';
                 if (text.isEmpty) {
-                  return context.tr('濮撳悕涓嶈兘涓虹┖', 'Name is required');
+                  return context.tr('姓名不能为空', 'Name is required');
                 }
                 if (text.length < 2 || text.length > 20) {
                   return context.tr(
@@ -712,16 +712,16 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
             TextFormField(
               controller: _relationController,
               decoration:
-                  InputDecoration(labelText: context.tr('鍏崇郴', 'Relation')),
+                  InputDecoration(labelText: context.tr('关系', 'Relation')),
               validator: (value) => (value == null || value.trim().isEmpty)
-                  ? context.tr('鍏崇郴涓嶈兘涓虹┖', 'Relation is required')
+                  ? context.tr('关系不能为空', 'Relation is required')
                   : null,
             ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(
               controller: _ageController,
               keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: context.tr('骞撮緞', 'Age')),
+              decoration: InputDecoration(labelText: context.tr('年龄', 'Age')),
               validator: (value) {
                 final text = value?.trim() ?? '';
                 if (text.isEmpty) {
@@ -733,7 +733,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
                 }
                 if (age < 0 || age > 120) {
                   return context.tr(
-                    '骞撮緞闇€鍦?0-120 涔嬮棿',
+                    '年龄需在 0-120 之间',
                     'Age must be between 0 and 120',
                   );
                 }
@@ -744,7 +744,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
             DropdownButtonFormField<String>(
               initialValue: _gender,
               decoration:
-                  InputDecoration(labelText: context.tr('鎬у埆', 'Gender')),
+                  InputDecoration(labelText: context.tr('性别', 'Gender')),
               items: genderValues
                   .map(
                     (item) => DropdownMenuItem<String>(
@@ -765,7 +765,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-          child: Text(context.tr('鍙栨秷', 'Cancel')),
+          child: Text(context.tr('取消', 'Cancel')),
         ),
         FilledButton(
           onPressed: () {
@@ -782,7 +782,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
               ),
             );
           },
-          child: Text(context.tr('淇濆瓨', 'Save')),
+          child: Text(context.tr('保存', 'Save')),
         ),
       ],
     );
@@ -904,13 +904,13 @@ class _MemberCard extends StatelessWidget {
               _ActionIconButton(
                 icon: Icons.settings_outlined,
                 onPressed: onEdit,
-                tooltip: context.tr('缂栬緫鎴愬憳', 'Edit member'),
+                tooltip: context.tr('编辑成员', 'Edit member'),
               ),
               const SizedBox(width: 2),
               _ActionIconButton(
                 icon: Icons.delete_outline,
                 onPressed: onDelete,
-                tooltip: context.tr('鍒犻櫎鎴愬憳', 'Delete member'),
+                tooltip: context.tr('删除成员', 'Delete member'),
                 color: AppColors.rose,
               ),
             ],
@@ -938,7 +938,7 @@ class _MemberCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            context.tr('寤鸿闄╃', 'Suggested coverage'),
+            context.tr('建议险种', 'Suggested coverage'),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 13,
@@ -948,7 +948,7 @@ class _MemberCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           if (tags.isEmpty)
             Text(
-              context.tr('鏆傛棤寤鸿', 'No suggestions yet'),
+              context.tr('暂无建议', 'No suggestions yet'),
               style: const TextStyle(color: Colors.white60, fontSize: 12),
             )
           else
@@ -1016,20 +1016,20 @@ class _AgeTierBadge extends StatelessWidget {
     if (value < 18) {
       return _AgeTierSpec(
         icon: Icons.child_care_rounded,
-        label: context.tr('鍎跨', 'Child'),
+        label: context.tr('儿童', 'Child'),
         color: const Color(0xFF6CCBFF),
       );
     }
     if (value < 60) {
       return _AgeTierSpec(
         icon: Icons.person_rounded,
-        label: context.tr('鎴愪汉', 'Adult'),
+        label: context.tr('成人', 'Adult'),
         color: const Color(0xFF79E2AE),
       );
     }
     return _AgeTierSpec(
       icon: Icons.elderly_rounded,
-      label: context.tr('鑰佷汉', 'Senior'),
+      label: context.tr('老人', 'Senior'),
       color: const Color(0xFFFFC986),
     );
   }
@@ -1060,7 +1060,7 @@ class _ScoreBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message:
-          '${context.tr('瀹跺涵缁村害璇勫垎', 'Household-dimension score')}: $score/100',
+          '${context.tr('家庭维度评分', 'Household-dimension score')}: $score/100',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
@@ -1078,7 +1078,7 @@ class _ScoreBadge extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  context.tr('淇濋殰璇勫垎', 'Protection score'),
+                  context.tr('保障评分', 'Protection score'),
                   style: TextStyle(
                     color: color.withValues(alpha: 0.9),
                     fontWeight: FontWeight.w700,

@@ -390,8 +390,7 @@ class ApiClient {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException(
-          _resolveErrorMessage(response.body, 'Delete PDF failed'));
+      throw ApiException(_resolveErrorMessage(response.body, '删除PDF失败'));
     }
 
     return DeleteFamilyDocumentResult.fromJson(
