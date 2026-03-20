@@ -1,5 +1,9 @@
 ﻿# WeAreFamily - Family Policy AI Steward
 
+## Product Baseline
+- Requirements baseline (for intent alignment and future expansion):
+  - `docs/PRODUCT_REQUIREMENTS.md`
+
 ## Goals
 - Frontend: Flutter (mobile + web/desktop)
 - Backend: Node.js + PostgreSQL/MySQL (either)

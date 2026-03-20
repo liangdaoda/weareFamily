@@ -21,7 +21,7 @@ export interface ScanPolicyResult {
   aiNotes: string | null;
   signals: PolicyFeatureSignals;
   coverageItems: PolicyCoverageItem[];
-  source: 'external' | 'heuristic';
+  source: 'external' | 'heuristic' | 'textin';
 }
 
 interface PartialScan {
@@ -44,6 +44,17 @@ export async function scanPolicyFromPdf(buffer: Buffer, fileName: string): Promi
 
   const heuristic = heuristicScan(text, fileName);
 
+  if (env.aiScanProvider === 'textin' && env.textInAppId && env.textInSecretCode) {
+    try {
+      const textIn = await textInScan(fileName, buffer);
+      return mergeScan(heuristic, textIn, 'textin');
+    } catch (_) {
+      const fallback = mergeScan(heuristic, {}, 'heuristic');
+      fallback.aiNotes = `TextIn识别失败，已使用规则抽取。${fallback.aiNotes ?? ''}`.trim();
+      return fallback;
+    }
+  }
+
   if (env.aiScanProvider === 'external' && env.aiScanUrl) {
     try {
       const external = await externalScan(text, fileName, buffer);
@@ -56,6 +67,36 @@ export async function scanPolicyFromPdf(buffer: Buffer, fileName: string): Promi
   }
 
   return mergeScan(heuristic, {}, 'heuristic');
+}
+
+async function textInScan(fileName: string, buffer: Buffer): Promise<PartialScan> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), env.aiScanTimeoutMs);
+
+  try {
+    const response = await fetch(env.textInScanUrl, {
+      method: 'POST',
+      headers: {
+        'x-ti-app-id': env.textInAppId,
+        'x-ti-secret-code': env.textInSecretCode,
+        'content-type': 'application/octet-stream',
+      },
+      body: new Uint8Array(buffer),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`TextIn scan failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as Record<string, unknown>;
+    const structured = normalizeExternal(payload);
+    const ocrText = extractTextInRecognizedText(payload);
+    const ocrParsed = ocrText ? heuristicScan(ocrText, fileName) : {};
+    return mergePartialScan(ocrParsed, structured, `TextIn OCR(${fileName})`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function externalScan(text: string, fileName: string, buffer: Buffer): Promise<PartialScan> {
@@ -87,6 +128,87 @@ async function externalScan(text: string, fileName: string, buffer: Buffer): Pro
     return normalizeExternal(payload);
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+function mergePartialScan(base: PartialScan, override: PartialScan, fallbackNote: string): PartialScan {
+  return {
+    policyNo: override.policyNo ?? base.policyNo,
+    insurerName: override.insurerName ?? base.insurerName,
+    productName: override.productName ?? base.productName,
+    premium: override.premium ?? base.premium,
+    currency: override.currency ?? base.currency,
+    startDate: override.startDate ?? base.startDate,
+    endDate: override.endDate ?? base.endDate,
+    aiRiskScore: override.aiRiskScore ?? base.aiRiskScore,
+    aiNotes: override.aiNotes ?? base.aiNotes ?? fallbackNote,
+    signals: mergeSignals(base.signals, override.signals),
+    coverageItems: (override.coverageItems && override.coverageItems.length > 0)
+      ? override.coverageItems
+      : base.coverageItems,
+  };
+}
+
+function extractTextInRecognizedText(payload: Record<string, unknown>): string {
+  const fragments: string[] = [];
+  const candidates: unknown[] = [
+    payload,
+    payload.result,
+    payload.data,
+    resolvePayloadObject(payload),
+  ];
+
+  for (const candidate of candidates) {
+    collectTextInNode(candidate, fragments, 0);
+  }
+
+  return Array.from(
+    new Set(
+      fragments
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    ),
+  ).join('\n');
+}
+
+function collectTextInNode(node: unknown, out: string[], depth: number): void {
+  if (depth > 6 || node === null || node === undefined) {
+    return;
+  }
+
+  if (typeof node === 'string') {
+    const text = node.trim();
+    if (text.length > 1 && /[\u4e00-\u9fa5A-Za-z0-9]/.test(text)) {
+      out.push(text);
+    }
+    return;
+  }
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectTextInNode(item, out, depth + 1);
+    }
+    return;
+  }
+
+  if (typeof node !== 'object') {
+    return;
+  }
+
+  const obj = node as Record<string, unknown>;
+  const directText = obj.text ?? obj.content;
+  if (typeof directText === 'string') {
+    const text = directText.trim();
+    if (text.length > 0) {
+      out.push(text);
+    }
+  }
+
+  for (const key of ['lines', 'areas', 'blocks', 'paragraphs', 'pages', 'words', 'items', 'children']) {
+    const value = obj[key];
+    if (value !== undefined) {
+      collectTextInNode(value, out, depth + 1);
+    }
   }
 }
 

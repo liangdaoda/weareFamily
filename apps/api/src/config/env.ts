@@ -4,7 +4,7 @@ import 'dotenv/config';
 export type DbClient = 'postgres' | 'mysql';
 export type TenantMode = 'saas' | 'private';
 export type UserRole = 'broker' | 'consumer' | 'admin';
-export type AiScanProvider = 'heuristic' | 'external';
+export type AiScanProvider = 'heuristic' | 'external' | 'textin';
 
 // Ensure required environment variables are present.
 function readEnv(name: string, fallback?: string): string {
@@ -31,9 +31,15 @@ const tenantMode: TenantMode = rawTenantMode === 'private' ? 'private' : 'saas';
 
 const rawAiProvider = (
   process.env.AI_SCAN_PROVIDER ??
-  (process.env.AI_SCAN_URL ? 'external' : 'heuristic')
+  (
+    process.env.TEXTIN_APP_ID && process.env.TEXTIN_SECRET_CODE
+      ? 'textin'
+      : (process.env.AI_SCAN_URL ? 'external' : 'heuristic')
+  )
 ).toLowerCase();
-const aiScanProvider: AiScanProvider = rawAiProvider === 'external' ? 'external' : 'heuristic';
+const aiScanProvider: AiScanProvider = rawAiProvider === 'textin'
+  ? 'textin'
+  : (rawAiProvider === 'external' ? 'external' : 'heuristic');
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -56,5 +62,10 @@ export const env = {
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
   aiScanProvider,
   aiScanUrl: process.env.AI_SCAN_URL ?? '',
+  textInAppId: process.env.TEXTIN_APP_ID ?? '',
+  textInSecretCode: process.env.TEXTIN_SECRET_CODE ?? '',
+  textInScanUrl:
+    process.env.TEXTIN_SCAN_URL ??
+    'https://api.textin.com/ai/service/v2/recognize/document',
   aiScanTimeoutMs: Number(process.env.AI_SCAN_TIMEOUT_MS ?? 15000),
 };
