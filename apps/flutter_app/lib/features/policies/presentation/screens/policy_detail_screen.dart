@@ -7,6 +7,7 @@ import 'package:wearefamily_app/core/api/api_client.dart';
 import 'package:wearefamily_app/core/i18n/locale_text.dart';
 import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 import 'package:wearefamily_app/shared/widgets/decorative_background.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
 
@@ -31,21 +32,22 @@ class PolicyDetailScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
+        foregroundColor: context.visualTokens.textPrimary,
+        iconTheme: IconThemeData(color: context.visualTokens.textPrimary),
         leading: IconButton(
-          icon: const Icon(CupertinoIcons.back, color: Colors.white),
+          icon: Icon(CupertinoIcons.back,
+              color: context.visualTokens.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
           tooltip: context.tr('返回', 'Back'),
         ),
         title: Text(context.tr('保单详情', 'Policy details'),
-            style: const TextStyle(color: Colors.white)),
+            style: TextStyle(color: context.visualTokens.textPrimary)),
         centerTitle: false,
         actions: [
           if (onDeletePolicy != null)
             IconButton(
-              icon: const Icon(CupertinoIcons.delete_simple,
-                  color: Colors.white70),
+              icon: Icon(CupertinoIcons.delete_simple,
+                  color: context.visualTokens.textSecondary),
               tooltip: context.tr('删除保单', 'Delete policy'),
               onPressed: () async {
                 final deleted = await onDeletePolicy!.call();
@@ -153,7 +155,7 @@ class _Header extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .headlineSmall
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: context.visualTokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
@@ -161,7 +163,7 @@ class _Header extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .bodyLarge
-                ?.copyWith(color: Colors.white70),
+                ?.copyWith(color: context.visualTokens.textSecondary),
           ),
           const SizedBox(height: AppSpacing.sm),
           Row(
@@ -170,7 +172,7 @@ class _Header extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Text(
                 '${context.tr('保单号', 'Policy No.')}: ${policy.policyNo}',
-                style: const TextStyle(color: Colors.white70),
+                style: TextStyle(color: context.visualTokens.textSecondary),
               ),
             ],
           ),
@@ -199,7 +201,7 @@ class _BasicInfoCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: context.visualTokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           _InfoRow(
@@ -243,7 +245,7 @@ class _PremiumCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: context.visualTokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           _InfoRow(
@@ -261,7 +263,7 @@ class _PremiumCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .bodySmall
-                ?.copyWith(color: Colors.white70),
+                ?.copyWith(color: context.visualTokens.textSecondary),
           ),
         ],
       ),
@@ -288,7 +290,7 @@ class _ScheduleCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: context.visualTokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           _InfoRow(
@@ -311,7 +313,7 @@ class _ScheduleCard extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
-                    ?.copyWith(color: Colors.white70),
+                    ?.copyWith(color: context.visualTokens.textSecondary),
               ),
             ],
           ),
@@ -346,12 +348,15 @@ class _CoverageItemsCard extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
-                    ?.copyWith(color: Colors.white),
+                    ?.copyWith(color: context.visualTokens.textPrimary),
               ),
               const SizedBox(width: 8),
               Text(
                 '(${items.length})',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                style: TextStyle(
+                  color: context.visualTokens.textSecondary,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -360,13 +365,19 @@ class _CoverageItemsCard extends StatelessWidget {
             Text(
               context.tr('当前未识别到可结构化的保障条目。',
                   'No structured coverage items were recognized.'),
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(
+                color: context.visualTokens.textSecondary,
+                fontSize: 12,
+              ),
             )
           else ...[
             Text(
               context.tr('点击下方可折叠查看完整保障项目与保额。',
                   'Tap below to expand full coverage and insured amounts.'),
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(
+                color: context.visualTokens.textSecondary,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 6),
             Theme(
@@ -375,12 +386,12 @@ class _CoverageItemsCard extends StatelessWidget {
               child: ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
-                collapsedIconColor: Colors.white70,
-                iconColor: Colors.white,
+                collapsedIconColor: context.visualTokens.textSecondary,
+                iconColor: context.visualTokens.textPrimary,
                 title: Text(
                   context.tr('展开保障明细', 'Expand coverage details'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.visualTokens.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -388,7 +399,10 @@ class _CoverageItemsCard extends StatelessWidget {
                 subtitle: Text(
                   context.tr('含责任名称、保额与备注',
                       'Includes item name, sum insured, and notes'),
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  style: TextStyle(
+                    color: context.visualTokens.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
                 children: items
                     .map(
@@ -396,7 +410,8 @@ class _CoverageItemsCard extends StatelessWidget {
                         margin: const EdgeInsets.only(top: 8),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
+                          color: context.visualTokens.cardBackground
+                              .withValues(alpha: 0.52),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -417,8 +432,8 @@ class _CoverageItemsCard extends StatelessWidget {
                                 children: [
                                   Text(
                                     item.name,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: context.visualTokens.textPrimary,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -426,8 +441,8 @@ class _CoverageItemsCard extends StatelessWidget {
                                   const SizedBox(height: 2),
                                   Text(
                                     '${context.tr('保额', 'Sum insured')}: ${_formatMoney(item.sumInsured, policy.currency, context)}',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
+                                    style: TextStyle(
+                                      color: context.visualTokens.textSecondary,
                                       fontSize: 11,
                                     ),
                                   ),
@@ -436,8 +451,9 @@ class _CoverageItemsCard extends StatelessWidget {
                                     const SizedBox(height: 2),
                                     Text(
                                       item.description!,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
+                                      style: TextStyle(
+                                        color:
+                                            context.visualTokens.textSecondary,
                                         fontSize: 11,
                                       ),
                                     ),
@@ -492,7 +508,7 @@ class _AiInsightCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: context.visualTokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           _InfoRow(label: context.tr('风险评分', 'Risk score'), value: riskText),
@@ -502,13 +518,18 @@ class _AiInsightCard extends StatelessWidget {
               value: '${ai.protectionScore}/100',
             ),
           const SizedBox(height: AppSpacing.xs),
-          Text(summary,
-              style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(
+            summary,
+            style: TextStyle(
+              color: context.visualTokens.textSecondary,
+              fontSize: 12,
+            ),
+          ),
           if (strengths.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(
               context.tr('当前优势', 'Strengths'),
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.mint,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -520,8 +541,10 @@ class _AiInsightCard extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       '• $item',
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(
+                        color: context.visualTokens.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ),
@@ -542,8 +565,10 @@ class _AiInsightCard extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       '• $item',
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(
+                        color: context.visualTokens.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ),
@@ -552,8 +577,8 @@ class _AiInsightCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               context.tr('优化建议', 'Recommendations'),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.visualTokens.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -563,8 +588,10 @@ class _AiInsightCard extends StatelessWidget {
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text('• $item',
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 12)),
+                        style: TextStyle(
+                          color: context.visualTokens.textSecondary,
+                          fontSize: 12,
+                        )),
                   ),
                 ),
           ],
@@ -597,20 +624,23 @@ class _CompetitiveChartCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: context.visualTokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             ai?.competitive.subtitle ??
                 context.tr('暂无对比数据。', 'No comparison data.'),
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+            style: TextStyle(
+              color: context.visualTokens.textSecondary,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           if (dimensions.isEmpty)
             Text(
               context.tr('当前保单暂无可视化对比指标。',
                   'No chart metrics available for this policy.'),
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: context.visualTokens.textSecondary),
             )
           else ...[
             SizedBox(
@@ -623,8 +653,8 @@ class _CompetitiveChartCard extends StatelessWidget {
                     show: true,
                     drawVerticalLine: false,
                     horizontalInterval: 20,
-                    getDrawingHorizontalLine: (_) => const FlLine(
-                      color: Colors.white12,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: context.visualTokens.chartGrid,
                       strokeWidth: 1,
                     ),
                   ),
@@ -648,8 +678,10 @@ class _CompetitiveChartCard extends StatelessWidget {
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
                               dimensions[index].label,
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 11),
+                              style: TextStyle(
+                                color: context.visualTokens.textSecondary,
+                                fontSize: 11,
+                              ),
                             ),
                           );
                         },
@@ -666,13 +698,13 @@ class _CompetitiveChartCard extends StatelessWidget {
                           toY: item.benchmark,
                           width: 14,
                           borderRadius: BorderRadius.circular(5),
-                          color: Colors.white.withValues(alpha: 0.45),
+                          color: context.visualTokens.chartReference,
                         ),
                         BarChartRodData(
                           toY: item.current,
                           width: 14,
                           borderRadius: BorderRadius.circular(5),
-                          color: AppColors.accent,
+                          color: context.visualTokens.accent,
                         ),
                       ],
                     );
@@ -684,11 +716,11 @@ class _CompetitiveChartCard extends StatelessWidget {
             Row(
               children: [
                 _LegendDot(
-                    color: Colors.white70,
+                    color: context.visualTokens.textSecondary,
                     label: context.tr('同类基准', 'Peer benchmark')),
                 const SizedBox(width: AppSpacing.md),
                 _LegendDot(
-                    color: AppColors.accent,
+                    color: context.visualTokens.accent,
                     label: context.tr('当前保单', 'Current policy')),
               ],
             ),
@@ -698,8 +730,11 @@ class _CompetitiveChartCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   '${item.label}: ${item.current.toStringAsFixed(0)} / ${context.tr('基准', 'Benchmark')} ${item.benchmark.toStringAsFixed(0)}\n${item.comment}',
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 12, height: 1.35),
+                  style: TextStyle(
+                    color: context.visualTokens.textSecondary,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
                 ),
               ),
             ),
@@ -730,7 +765,10 @@ class _LegendDot extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            style: TextStyle(
+              color: context.visualTokens.textSecondary,
+              fontSize: 12,
+            )),
       ],
     );
   }
@@ -752,11 +790,17 @@ class _InfoRow extends StatelessWidget {
           SizedBox(
             width: 90,
             child: Text(label,
-                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                style: TextStyle(
+                  color: context.visualTokens.textSecondary,
+                  fontSize: 12,
+                )),
           ),
           Expanded(
             child: Text(value,
-                style: const TextStyle(color: Colors.white, fontSize: 12)),
+                style: TextStyle(
+                  color: context.visualTokens.textPrimary,
+                  fontSize: 12,
+                )),
           ),
         ],
       ),
@@ -777,13 +821,13 @@ class _StatusChip extends StatelessWidget {
         color = AppColors.mint;
         break;
       case 'pending':
-        color = AppColors.accent;
+        color = context.visualTokens.accent;
         break;
       case 'expired':
         color = AppColors.rose;
         break;
       default:
-        color = Colors.white54;
+        color = context.visualTokens.textTertiary;
     }
 
     return Container(

@@ -8,6 +8,7 @@ import 'package:wearefamily_app/core/api/user_profile.dart';
 import 'package:wearefamily_app/core/i18n/locale_text.dart';
 import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
 
 int? _ageFromBirthDate(String? birthDate) {
@@ -64,6 +65,13 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
   List<FamilyDocument> _documents = const [];
   List<Policy> _familyPolicies = const [];
   FamilyInsight? _familyInsight;
+  IncomeBenchmark? _incomeBenchmark;
+  List<BrokerFamilyItem> _brokerFamilies = const [];
+  List<OpsTask> _opsTasks = const [];
+
+  bool get _isBrokerSide =>
+      widget.profile.role == UserRole.broker ||
+      widget.profile.role == UserRole.admin;
 
   @override
   void initState() {
@@ -110,21 +118,44 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
     });
 
     try {
+      final benchmarkFuture = widget.apiClient
+          .fetchCurrentIncomeBenchmark(widget.profile)
+          .then<IncomeBenchmark?>((value) => value)
+          .catchError((_) => null);
+      final brokerFamiliesFuture = _isBrokerSide
+          ? widget.apiClient
+              .fetchBrokerFamilies(widget.profile)
+              .then<BrokerFamiliesOverview?>((value) => value)
+              .catchError((_) => null)
+          : Future<BrokerFamiliesOverview?>.value(null);
+      final opsTasksFuture = _isBrokerSide
+          ? widget.apiClient
+              .fetchOpsTasks(widget.profile, familyId: familyId)
+              .catchError((_) => const <OpsTask>[])
+          : Future.value(const <OpsTask>[]);
+
       final results = await Future.wait([
         widget.apiClient.fetchFamilyMembers(widget.profile, familyId),
         widget.apiClient.fetchFamilyDocuments(widget.profile, familyId),
         widget.apiClient.fetchFamilyInsight(widget.profile, familyId),
         widget.apiClient.fetchPolicies(widget.profile),
+        benchmarkFuture,
+        brokerFamiliesFuture,
+        opsTasksFuture,
       ]);
       final policies = (results[3] as List<Policy>)
           .where((item) => item.familyId == familyId)
           .toList(growable: false);
+      final brokerOverview = results[5] as BrokerFamiliesOverview?;
 
       setState(() {
         _members = results[0] as List<FamilyMember>;
         _documents = results[1] as List<FamilyDocument>;
         _familyInsight = results[2] as FamilyInsight;
         _familyPolicies = policies;
+        _incomeBenchmark = results[4] as IncomeBenchmark?;
+        _brokerFamilies = brokerOverview?.items ?? const <BrokerFamilyItem>[];
+        _opsTasks = results[6] as List<OpsTask>;
       });
     } catch (error) {
       setState(() => _error = error.toString());
@@ -417,16 +448,336 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
     return tags.take(6).toList(growable: false);
   }
 
+  String _formatMoney(double value, [String currency = 'CNY']) {
+    return '${value.toStringAsFixed(2)} $currency';
+  }
+
+  String _formatRatio(double ratio) {
+    return '${(ratio * 100).toStringAsFixed(1)}%';
+  }
+
+  String _formatDateLabel(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return context.tr('未知', 'Unknown');
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return value;
+    }
+    return _formatYmd(parsed.toLocal());
+  }
+
+  String _reviewLabel(String status) {
+    switch (status) {
+      case 'success':
+        return context.tr('已通过', 'Passed');
+      case 'needs_review':
+        return context.tr('待复核', 'Needs review');
+      case 'failed':
+        return context.tr('失败', 'Failed');
+      default:
+        return context.tr('处理中', 'Pending');
+    }
+  }
+
+  Color _reviewColor(String status) {
+    switch (status) {
+      case 'success':
+        return AppColors.mint;
+      case 'needs_review':
+        return context.visualTokens.accent;
+      case 'failed':
+        return AppColors.rose;
+      default:
+        return context.visualTokens.textSecondary;
+    }
+  }
+
+  Future<void> _updateTaskStatus(OpsTask task, String status) async {
+    try {
+      await widget.apiClient.updateOpsTaskStatus(
+        profile: widget.profile,
+        taskId: task.id,
+        status: status,
+      );
+      await _loadFamilyDetails();
+      if (mounted) {
+        _showTopToast(context.tr('任务状态已更新', 'Task status updated'));
+      }
+    } catch (error) {
+      if (mounted) {
+        _showTopToast(error.toString());
+      }
+    }
+  }
+
+  Widget _buildAnnualBurdenCard() {
+    final insight = _familyInsight;
+    final benchmark = _incomeBenchmark;
+    final currency = insight?.benchmarkIncome.currency.isNotEmpty == true
+        ? insight!.benchmarkIncome.currency
+        : (benchmark?.currency.isNotEmpty == true
+            ? benchmark!.currency
+            : 'CNY');
+    final annualPremium = insight?.annualPremiumTotal ?? 0;
+    final monthlyPremium = insight?.monthlyPremiumAvg ?? 0;
+    final ratio = insight?.premiumIncomeRatio ?? 0;
+    final benchmarkMonthly =
+        insight?.benchmarkIncome.monthly ?? benchmark?.monthlyIncome ?? 0;
+    final asOf = benchmark?.fetchedAt ?? insight?.benchmarkAsOf;
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.tr('年度保费负担', 'Annual premium burden'),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: context.visualTokens.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _MetricPill(
+                label: context.tr('年总保费', 'Annual premium'),
+                value: _formatMoney(annualPremium, currency),
+              ),
+              _MetricPill(
+                label: context.tr('月均保费', 'Monthly premium'),
+                value: _formatMoney(monthlyPremium, currency),
+              ),
+              _MetricPill(
+                label: context.tr('收入占比', 'Income ratio'),
+                value: _formatRatio(ratio),
+                valueColor: ratio >= 0.2 ? AppColors.rose : AppColors.mint,
+              ),
+              _MetricPill(
+                label: context.tr('基准月收入', 'Benchmark monthly income'),
+                value: _formatMoney(benchmarkMonthly, currency),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${context.tr('基准快照时间', 'Snapshot time')}: ${_formatDateLabel(asOf)}',
+            style: TextStyle(
+              color: context.visualTokens.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          if (benchmark?.stale == true) ...[
+            const SizedBox(height: 6),
+            Text(
+              context.tr(
+                '基准数据可能过期，当前使用最近快照。',
+                'Benchmark data may be stale. Using latest snapshot.',
+              ),
+              style: TextStyle(
+                color: context.visualTokens.warning,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBrokerFamiliesCard() {
+    final items = _brokerFamilies.take(8).toList(growable: false);
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.tr('家庭运营台', 'Family operations board'),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: context.visualTokens.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (items.isEmpty)
+            Text(
+              context.tr('暂无运营数据', 'No operations data'),
+              style: TextStyle(color: context.visualTokens.textSecondary),
+            )
+          else
+            ...items.map((item) {
+              final riskColor = item.risk >= 70
+                  ? AppColors.rose
+                  : item.risk >= 45
+                      ? context.visualTokens.accent
+                      : AppColors.mint;
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: context.visualTokens.cardBackground
+                      .withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: context.visualTokens.cardBorder),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.familyName,
+                            style: TextStyle(
+                              color: context.visualTokens.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${context.tr('负担占比', 'Burden')}: ${_formatRatio(item.premiumIncomeRatio)}'
+                            ' · ${context.tr('性价比', 'Value')}: ${item.valueScore?.toStringAsFixed(1) ?? '--'}',
+                            style: TextStyle(
+                              color: context.visualTokens.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: riskColor.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: riskColor.withValues(alpha: 0.45)),
+                      ),
+                      child: Text(
+                        '${context.tr('风险', 'Risk')} ${item.risk.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: riskColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOpsTasksCard() {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.tr('任务面板', 'Task panel'),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: context.visualTokens.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (_opsTasks.isEmpty)
+            Text(
+              context.tr('暂无待办任务', 'No tasks'),
+              style: TextStyle(color: context.visualTokens.textSecondary),
+            )
+          else
+            ..._opsTasks.take(10).map((task) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: context.visualTokens.cardBackground
+                      .withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: context.visualTokens.cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            style: TextStyle(
+                              color: context.visualTokens.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          task.status,
+                          style: TextStyle(
+                            color: context.visualTokens.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (task.description != null &&
+                        task.description!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        task.description!,
+                        style: TextStyle(
+                          color: context.visualTokens.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (task.status == 'open')
+                          OutlinedButton(
+                            onPressed: () =>
+                                _updateTaskStatus(task, 'in_progress'),
+                            child: Text(context.tr('开始处理', 'Start')),
+                          ),
+                        if (task.status == 'open' ||
+                            task.status == 'in_progress')
+                          FilledButton(
+                            onPressed: () => _updateTaskStatus(task, 'done'),
+                            child: Text(context.tr('标记完成', 'Done')),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadingFamilies) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColors.accent));
+      return Center(
+        child: CircularProgressIndicator(color: context.visualTokens.accent),
+      );
     }
     if (_families.isEmpty) {
       return Center(
           child: Text(context.tr('暂无家庭数据', 'No family data'),
-              style: const TextStyle(color: Colors.white70)));
+              style: TextStyle(color: context.visualTokens.textSecondary)));
     }
 
     final selectedFamily = _families.firstWhere(
@@ -444,13 +795,14 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
               Row(children: [
                 Expanded(
                     child: Text(context.tr('家庭中心', 'Family center'),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(color: Colors.white))),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: context.visualTokens.textPrimary))),
                 IconButton(
                     onPressed: _loadingDetails ? null : _loadFamilyDetails,
-                    icon: const Icon(Icons.refresh, color: Colors.white70)),
+                    icon: Icon(
+                      Icons.refresh,
+                      color: context.visualTokens.textSecondary,
+                    )),
               ]),
               DropdownButtonFormField<String>(
                 initialValue: selectedFamily.id,
@@ -474,6 +826,14 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
             ]),
           ),
           const SizedBox(height: AppSpacing.lg),
+          _buildAnnualBurdenCard(),
+          const SizedBox(height: AppSpacing.lg),
+          if (_isBrokerSide) ...[
+            _buildBrokerFamiliesCard(),
+            const SizedBox(height: AppSpacing.lg),
+            _buildOpsTasksCard(),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           GlassCard(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -484,7 +844,8 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
-                            ?.copyWith(color: Colors.white))),
+                            ?.copyWith(
+                                color: context.visualTokens.textPrimary))),
                 FilledButton.icon(
                     onPressed:
                         _loadingDetails ? null : () => _addOrEditMember(),
@@ -494,7 +855,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
               const SizedBox(height: AppSpacing.md),
               if (_members.isEmpty)
                 Text(context.tr('暂无成员', 'No members'),
-                    style: const TextStyle(color: Colors.white70))
+                    style: TextStyle(color: context.visualTokens.textSecondary))
               else
                 ..._members.map((m) {
                   final memberPolicies = _policiesForMember(m);
@@ -525,7 +886,8 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
-                            ?.copyWith(color: Colors.white))),
+                            ?.copyWith(
+                                color: context.visualTokens.textPrimary))),
                 FilledButton.icon(
                     onPressed: _loadingDetails ? null : _uploadPdf,
                     icon: const Icon(Icons.upload_file, size: 16),
@@ -534,7 +896,7 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
               const SizedBox(height: AppSpacing.md),
               if (_documents.isEmpty)
                 Text(context.tr('暂无保单PDF', 'No policy PDFs'),
-                    style: const TextStyle(color: Colors.white70))
+                    style: TextStyle(color: context.visualTokens.textSecondary))
               else
                 ..._documents.map((d) {
                   final kb = max(1, d.fileSize ~/ 1024);
@@ -547,10 +909,11 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                       vertical: AppSpacing.sm,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: context.visualTokens.cardBackground
+                          .withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.12)),
+                      border:
+                          Border.all(color: context.visualTokens.cardBorder),
                     ),
                     child: Row(
                       children: [
@@ -562,14 +925,40 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                                 d.fileName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white),
+                                style: TextStyle(
+                                  color: context.visualTokens.textPrimary,
+                                ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 '$kb KB · ${context.tr(hasLinkedPolicy ? '已关联保单' : '未关联保单', hasLinkedPolicy ? 'Linked policy' : 'No linked policy')}',
-                                style: const TextStyle(
-                                  color: Colors.white60,
+                                style: TextStyle(
+                                  color: context.visualTokens.textTertiary,
                                   fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _reviewColor(d.reviewStatus)
+                                      .withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: _reviewColor(d.reviewStatus)
+                                        .withValues(alpha: 0.45),
+                                  ),
+                                ),
+                                child: Text(
+                                  _reviewLabel(d.reviewStatus),
+                                  style: TextStyle(
+                                    color: _reviewColor(d.reviewStatus),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ],
@@ -814,27 +1203,20 @@ class _MemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scoreColor = _scoreColor(score);
+    final scoreColor = _scoreColor(context, score);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
+        color: context.visualTokens.memberCardBg,
         borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.14),
-            Colors.white.withValues(alpha: 0.07),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        boxShadow: const [
+        border: Border.all(color: context.visualTokens.memberCardBorder),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x33112944),
-            blurRadius: 18,
-            offset: Offset(0, 8),
+            color: context.visualTokens.memberCardShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -849,7 +1231,10 @@ class _MemberCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFB8D7FF), Color(0xFF86C0FF)],
+                    colors: [
+                      AppColors.memberAvatarStart,
+                      AppColors.memberAvatarEnd,
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -873,8 +1258,8 @@ class _MemberCard extends StatelessWidget {
                       member.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: context.visualTokens.textPrimary,
                         fontSize: 21,
                         fontWeight: FontWeight.w800,
                       ),
@@ -887,7 +1272,9 @@ class _MemberCard extends StatelessWidget {
                       children: [
                         Text(
                           member.relation,
-                          style: const TextStyle(color: Colors.white70),
+                          style: TextStyle(
+                            color: context.visualTokens.textSecondary,
+                          ),
                         ),
                         if (memberAge != null) _AgeTierBadge(age: memberAge!),
                       ],
@@ -939,8 +1326,8 @@ class _MemberCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             context.tr('建议险种', 'Suggested coverage'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: context.visualTokens.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -949,7 +1336,10 @@ class _MemberCard extends StatelessWidget {
           if (tags.isEmpty)
             Text(
               context.tr('暂无建议', 'No suggestions yet'),
-              style: const TextStyle(color: Colors.white60, fontSize: 12),
+              style: TextStyle(
+                color: context.visualTokens.textTertiary,
+                fontSize: 12,
+              ),
             )
           else
             Wrap(
@@ -964,15 +1354,15 @@ class _MemberCard extends StatelessWidget {
     );
   }
 
-  Color _scoreColor(int? value) {
+  Color _scoreColor(BuildContext context, int? value) {
     if (value == null) {
-      return Colors.white70;
+      return context.visualTokens.textSecondary;
     }
     if (value >= 75) {
       return AppColors.mint;
     }
     if (value >= 55) {
-      return AppColors.accent;
+      return context.visualTokens.accent;
     }
     return AppColors.rose;
   }
@@ -1017,20 +1407,20 @@ class _AgeTierBadge extends StatelessWidget {
       return _AgeTierSpec(
         icon: Icons.child_care_rounded,
         label: context.tr('儿童', 'Child'),
-        color: const Color(0xFF6CCBFF),
+        color: AppColors.ageTierChild,
       );
     }
     if (value < 60) {
       return _AgeTierSpec(
         icon: Icons.person_rounded,
         label: context.tr('成人', 'Adult'),
-        color: const Color(0xFF79E2AE),
+        color: AppColors.ageTierAdult,
       );
     }
     return _AgeTierSpec(
       icon: Icons.elderly_rounded,
       label: context.tr('老人', 'Senior'),
-      color: const Color(0xFFFFC986),
+      color: AppColors.ageTierSenior,
     );
   }
 }
@@ -1110,20 +1500,21 @@ class _ActionIconButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     required this.tooltip,
-    this.color = Colors.white70,
+    this.color,
   });
 
   final IconData icon;
   final VoidCallback? onPressed;
   final String tooltip;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = color ?? context.visualTokens.textSecondary;
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: context.visualTokens.memberInnerBlockBg,
         borderRadius: BorderRadius.circular(9),
         child: InkWell(
           onTap: onPressed,
@@ -1131,7 +1522,7 @@ class _ActionIconButton extends StatelessWidget {
           child: SizedBox(
             width: 32,
             height: 32,
-            child: Icon(icon, size: 18, color: color),
+            child: Icon(icon, size: 18, color: iconColor),
           ),
         ),
       ),
@@ -1160,24 +1551,24 @@ class _MemberStatTile extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: const Color(0x40162B43),
+        color: context.visualTokens.memberInnerBlockBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: context.visualTokens.memberCardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 14, color: Colors.white60),
+              Icon(icon, size: 14, color: context.visualTokens.textTertiary),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: context.visualTokens.textSecondary,
                     fontSize: 11,
                   ),
                 ),
@@ -1192,8 +1583,8 @@ class _MemberStatTile extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.visualTokens.textPrimary,
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
                 height: 1.05,
@@ -1221,8 +1612,8 @@ class _UnitAwareValueText extends StatelessWidget {
         value,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: context.visualTokens.textPrimary,
           fontSize: 22,
           fontWeight: FontWeight.w800,
           height: 1.06,
@@ -1234,14 +1625,14 @@ class _UnitAwareValueText extends StatelessWidget {
     final number = match.group(2)!;
     final unitRight = match.group(3)!;
 
-    const numberStyle = TextStyle(
-      color: Colors.white,
+    final numberStyle = TextStyle(
+      color: context.visualTokens.textPrimary,
       fontSize: 22,
       fontWeight: FontWeight.w800,
       height: 1.06,
     );
-    const unitStyle = TextStyle(
-      color: Colors.white70,
+    final unitStyle = TextStyle(
+      color: context.visualTokens.textSecondary,
       fontSize: 13,
       fontWeight: FontWeight.w700,
       height: 1.1,
@@ -1271,17 +1662,64 @@ class _MemberTagChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: context.visualTokens.memberChipBg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        border: Border.all(color: context.visualTokens.memberCardBorder),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: context.visualTokens.textPrimary,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
+      ),
+    );
+  }
+}
+
+class _MetricPill extends StatelessWidget {
+  const _MetricPill({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedValueColor = valueColor ?? context.visualTokens.textPrimary;
+    return Container(
+      constraints: const BoxConstraints(minWidth: 148),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.visualTokens.cardBackground.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.visualTokens.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: context.visualTokens.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: TextStyle(
+              color: resolvedValueColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

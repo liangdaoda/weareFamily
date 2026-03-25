@@ -2,7 +2,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:wearefamily_app/core/theme/app_colors.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 
 class DecorativeBackground extends StatelessWidget {
   const DecorativeBackground({super.key, required this.child});
@@ -11,16 +11,17 @@ class DecorativeBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return Container(
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
+      decoration: BoxDecoration(
+        gradient: tokens.pageGradient,
       ),
       child: Stack(
         children: [
           const Positioned.fill(child: RepaintBoundary(child: _DotField())),
           Positioned.fill(
             child: Container(
-              decoration: const BoxDecoration(gradient: AppColors.glowGradient),
+              decoration: BoxDecoration(gradient: tokens.glowGradient),
             ),
           ),
           child,
@@ -36,9 +37,7 @@ class _DotField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _DotFieldPainter(
-        Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.08),
-      ),
+      painter: _DotFieldPainter(context.visualTokens.dotColor),
     );
   }
 }

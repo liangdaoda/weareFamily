@@ -44,6 +44,10 @@ export interface FamilyDocument {
   mimeType: string;
   fileSize: number;
   docType: string;
+  reviewStatus: 'pending' | 'success' | 'needs_review' | 'failed';
+  reviewNotes: string | null;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
   uploadedByUserId: string;
   createdAt: string;
 }

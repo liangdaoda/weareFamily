@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'app_typography.dart';
+import 'app_visual_tokens.dart';
 
 class AppTheme {
   static final ThemeData lightTheme = _buildTheme(Brightness.light);
@@ -11,26 +12,24 @@ class AppTheme {
 
   static ThemeData _buildTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
+    final tokens = isDark ? AppVisualTokens.dark : AppVisualTokens.light;
     final colorScheme = isDark
         ? const ColorScheme.dark(
-            primary: Colors.white,
-            secondary: AppColors.accent,
-            surface: AppColors.ink,
+            primary: Color(0xFFF4F6FF),
+            secondary: AppColors.darkAccent,
+            surface: Color(0xFF121A2E),
             error: AppColors.rose,
           )
         : const ColorScheme.light(
             primary: AppColors.ink,
             secondary: AppColors.accent,
-            surface: AppColors.foam,
+            surface: Color(0xFFF7FAFE),
             error: AppColors.rose,
           );
-    final onSurface = isDark ? Colors.white : AppColors.ink;
-    final fieldFill = isDark
-        ? Colors.white.withValues(alpha: 0.1)
-        : Colors.white.withValues(alpha: 0.84);
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.16)
-        : Colors.black.withValues(alpha: 0.08);
+    final onSurface = tokens.textPrimary;
+    final fieldFill =
+        isDark ? const Color(0x66131F34) : const Color(0xE8FFFFFF);
+    final borderColor = tokens.cardBorder;
 
     return ThemeData(
       useMaterial3: true,
@@ -40,6 +39,9 @@ class AppTheme {
       scaffoldBackgroundColor: isDark ? AppColors.night : AppColors.mist,
       textTheme:
           isDark ? AppTypography.darkTextTheme : AppTypography.lightTextTheme,
+      extensions: <ThemeExtension<dynamic>>[
+        tokens,
+      ],
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
@@ -52,11 +54,11 @@ class AppTheme {
       ),
       cupertinoOverrideTheme: CupertinoThemeData(
         brightness: brightness,
-        primaryColor: AppColors.accent,
+        primaryColor: tokens.accent,
         scaffoldBackgroundColor: isDark ? AppColors.night : AppColors.mist,
         barBackgroundColor: Colors.transparent,
         textTheme: CupertinoTextThemeData(
-          primaryColor: AppColors.accent,
+          primaryColor: tokens.accent,
           textStyle: TextStyle(color: onSurface),
           navTitleTextStyle: TextStyle(
             color: onSurface,
@@ -75,7 +77,7 @@ class AppTheme {
         centerTitle: false,
       ),
       cardTheme: CardThemeData(
-        color: isDark ? const Color(0xFF122235) : Colors.white,
+        color: tokens.cardBackground,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -94,20 +96,24 @@ class AppTheme {
           borderRadius: BorderRadius.circular(9),
           borderSide: BorderSide(color: borderColor),
         ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(9)),
-          borderSide: BorderSide(color: AppColors.accent, width: 1.3),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(9)),
+          borderSide: BorderSide(color: tokens.accent, width: 1.3),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
+          backgroundColor: tokens.accent,
+          foregroundColor: isDark ? Colors.white : AppColors.ink,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          foregroundColor: onSurface,
+          side: BorderSide(color: borderColor),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         ),
@@ -115,9 +121,8 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-        backgroundColor:
-            isDark ? const Color(0xFF14263A) : const Color(0xFF17324E),
-        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 13),
+        backgroundColor: tokens.sheetBackground,
+        contentTextStyle: TextStyle(color: tokens.textPrimary, fontSize: 13),
       ),
     );
   }

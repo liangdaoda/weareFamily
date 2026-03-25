@@ -5,6 +5,7 @@ export type DbClient = 'postgres' | 'mysql';
 export type TenantMode = 'saas' | 'private';
 export type UserRole = 'broker' | 'consumer' | 'admin';
 export type AiScanProvider = 'heuristic' | 'external' | 'textin';
+export type BenchmarkProvider = 'nbs' | 'url';
 
 // Ensure required environment variables are present.
 function readEnv(name: string, fallback?: string): string {
@@ -41,6 +42,9 @@ const aiScanProvider: AiScanProvider = rawAiProvider === 'textin'
   ? 'textin'
   : (rawAiProvider === 'external' ? 'external' : 'heuristic');
 
+const rawBenchmarkProvider = (process.env.BENCHMARK_PROVIDER ?? 'nbs').toLowerCase();
+const benchmarkProvider: BenchmarkProvider = rawBenchmarkProvider === 'url' ? 'url' : 'nbs';
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   host: process.env.HOST ?? '0.0.0.0',
@@ -68,4 +72,16 @@ export const env = {
     process.env.TEXTIN_SCAN_URL ??
     'https://api.textin.com/ai/service/v2/recognize/document',
   aiScanTimeoutMs: Number(process.env.AI_SCAN_TIMEOUT_MS ?? 15000),
+  benchmarkProvider,
+  benchmarkIncomeUrl: process.env.BENCHMARK_INCOME_URL ?? '',
+  benchmarkNbsEndpoint: process.env.BENCHMARK_NBS_ENDPOINT ?? 'https://data.stats.gov.cn/easyquery.htm',
+  benchmarkNbsDbCode: process.env.BENCHMARK_NBS_DB_CODE ?? 'hgnd',
+  benchmarkNbsIndicator: process.env.BENCHMARK_NBS_INDICATOR ?? 'A0A0101',
+  benchmarkSource: process.env.BENCHMARK_SOURCE ?? 'nbs-hgnd-a0a0101',
+  benchmarkRegion: process.env.BENCHMARK_REGION ?? 'CN',
+  benchmarkCurrency: process.env.BENCHMARK_CURRENCY ?? 'CNY',
+  benchmarkFetchIntervalHours: Number(process.env.BENCHMARK_FETCH_INTERVAL_HOURS ?? 168),
+  benchmarkTimeoutMs: Number(process.env.BENCHMARK_TIMEOUT_MS ?? 8000),
+  benchmarkDefaultAnnualIncome: Number(process.env.BENCHMARK_DEFAULT_ANNUAL_INCOME ?? 36000),
+  benchmarkSchedulerEnabled: parseBoolean(process.env.BENCHMARK_SCHEDULER_ENABLED, true),
 };

@@ -1,106 +1,135 @@
-# WeAreFamily 需求基线（Product Requirements Baseline）
+# WeAreFamily 产品需求基线（长期产品化 / 二期MVP）
 
 更新时间：2026-03-20  
-状态：当前有效（后续功能扩展以本文件为准）
+状态：当前有效（后续需求和开发默认以本文为单一事实来源）
 
-## 1. 文档目的
-- 固化项目初衷，避免功能迭代偏离方向。
-- 作为产品与研发统一的需求基线，便于后续快速扩展。
-- 明确当前阶段“先做什么、后做什么、不做什么”。
+## 1. 项目初衷（不可偏离）
+WeAreFamily 是面向经纪人（B 端）与家庭用户（C 端）的家庭保险管理平台，核心目标是把“看得懂、管得住、可运营”做成长期能力，而不是一次性功能堆叠。
 
-## 2. 项目初衷（不可偏离）
-WeAreFamily 是面向保险经纪人（B端）与家庭用户（C端）的多租户家庭保单平台，核心目标：
-- C端：管理家庭成员、导入保单、理解保障缺口。
-- B端：管理家庭池、识别高风险家庭、推进续保转化。
+新增并确认的关键初衷：
+1. 家庭必须清楚知道自己每年的保险支出是多少，并能与全国平均收入基准对比，判断负担是否合理。
+2. 家庭购买的保单要能做“性价比评估”，至少从保额、保障责任、免责/等待期、豁免条款、续保稳定性等维度体现，并结合 AI 给出可解释建议。
+3. 上述能力 C 端和 B 端都可用：
+- C 端用于家庭自我管理与决策。
+- B 端用于家庭池优先级管理、续保推进与服务运营。
 
-目标形态：
-- 前端：Flutter（移动端 + Web/桌面端）。
-- 后端：Node.js + 关系型数据库（PostgreSQL/MySQL）。
-- 交付：SaaS 优先，私有化兼容。
+## 2. 二期MVP目标（B/C 双端）
+### 2.1 成功标准
+- C 端可见：年总保费、月均保费、收入占比、性价比报告、改进建议。
+- B 端可见：按负担压力 + 性价比 + 到期风险管理家庭池，并可推进任务处理。
+- 外部收入基准异常时：系统自动降级到最近快照，核心页面可用。
 
-## 3. 产品原则
-- 双端并行：每个核心版本必须同时给 B 端和 C 端带来可感知价值。
-- AI可解释：AI结果必须可追溯（置信度、来源、修正记录）。
-- 租户安全优先：强租户隔离 + 资源级权限控制。
-- 可运营优先于演示：关键链路必须可监控、可审计、可测试。
+### 2.2 已确认的产品决策
+- 首期深度：运营增强版。
+- 性价比方法：规则打分 + AI 解释。
+- 收入基准：外部数据源自动更新。
+- 基准接入：定时拉取 + 本地快照兜底。
 
-## 4. 当前已实现能力（现状基线）
-- 认证与租户上下文：`tenantId + role`，支持 JWT 与 Header 语义。
-- 家庭管理：家庭列表、成员增删改查。
-- 保单管理：保单创建/列表/删除、仪表盘统计。
-- 文档能力：PDF上传，保单信息抽取（heuristic/external/textin）。
-- 洞察能力：保单洞察与家庭洞察返回结构已建立。
-- Flutter端：登录、看板、保单、家庭中心主流程可运行。
+## 3. 需求范围（本期必须落地）
+## 3.1 数据与领域模型
+- `income_benchmark_snapshots`
+  - 字段：source, period, publishedAt, effectiveDate, annualIncome, currency, region, fetchedAt, payload。
+- `policy_value_analyses`
+  - 字段：valueScore, valueConfidence, dimensions, reasons, recommendations, summary, scoringVersion。
+- `ops_tasks`
+  - 类型：`renewal_due` / `document_review` / `value_low_confidence` / `missing_data`。
+  - 状态：`open` / `in_progress` / `done` / `cancelled`。
 
-## 5. MVP需求清单（双端并行、SaaS优先、长期产品化）
-### 5.1 C端核心
-- 家庭成员维护与保单关联可视化。
-- PDF识别结果状态清晰化（成功/低置信度/失败）。
-- 保障缺口与建议的可解释展示。
+现有实体扩展：
+- `Policy`：`renewalStatus`、`assigneeUserId`、`lifecycleNote`、`valueScore`、`valueDimensions[]`、`valueSummary`、`valueConfidence`。
+- `FamilyInsight`：`annualPremiumTotal`、`monthlyPremiumAvg`、`premiumIncomeRatio`、`benchmarkIncome`、`benchmarkAsOf`。
+- `FamilyDocument`：`reviewStatus`、`reviewNotes`、`reviewedByUserId`、`reviewedAt`。
 
-### 5.2 B端核心
-- 按租户查看家庭池，支持风险优先级排序。
-- 保单生命周期管理（续保状态、负责人、处理记录）。
-- 经营看板（风险处理进度、续保推进情况）。
+## 3.2 评分与 AI 流水线
+固定 100 分模型（首版权重锁定）：
+- `coverageAdequacy` 30%
+- `affordability` 25%
+- `termsQuality` 20%
+- `waiverCompleteness` 15%
+- `renewalStability` 10%
 
-### 5.3 SaaS优先能力
-- 租户级配置能力与租户管理员边界。
-- 从“角色权限”升级到“资源级授权”。
-- 关键操作审计日志（成员/保单/文档变更轨迹）。
+规则：
+- AI 不参与打分，只负责解释与建议文案。
+- AI 失败时回退模板解释。
+- 低置信度触发：`valueConfidence < 0.65` 或关键字段缺失，自动生成运营任务。
 
-### 5.4 AI与文档运营化
-- 抽取结果增加置信度与字段来源（field source）。
-- 建立低置信度/失败的审核队列与处理流程。
-- 支持人工修正、回写、修正审计闭环。
+## 3.3 API 范围（保持 `/api/v1`）
+- `GET /api/v1/benchmarks/income/current`
+- `GET /api/v1/broker/families`（支持按 `risk`、`premiumIncomeRatio`、`valueScore`、`renewalDueDays` 排序/筛选）
+- `GET /api/v1/policies/:policyId/value-analysis`
+- `POST /api/v1/policies/:policyId/value-analysis/refresh`（broker/admin）
+- `PATCH /api/v1/policies/:policyId/lifecycle`
+- `GET /api/v1/tasks`
+- `PATCH /api/v1/tasks/:taskId`
 
-### 5.5 运营底座
-- 通知与任务中心：
-  - 到期待处理
-  - 识别待复核
-  - 关键资料缺失提醒
-- 指标体系：
-  - 转化率
-  - 识别成功率
-  - 续保完成率
-  - 家庭保障覆盖完整度
+权限策略：
+- `consumer`：仅自己的家庭。
+- `broker/admin`：本租户范围。
+- 所有新增接口：强制租户隔离。
 
-## 6. 接口与类型扩展基线
-保留现有 `/api/v1/auth|dashboard|families|policies`，新增能力域：
-- `broker families`：家庭池筛选、风险排序、续保优先级。
-- `policy lifecycle`：续保状态、处理人、处理日志。
-- `document review`：置信度、复核提交、修正审计。
-- `notifications/tasks`：用户任务流拉取与状态流转。
+## 3.4 前端交付范围
+C 端：
+- 家庭中心新增“年度保费负担卡”：年总保费、月均、收入占比、基准快照时间。
+- 保单详情新增“性价比报告卡”：总分、维度、建议、置信度、是否待复核。
 
-关键类型扩展：
-- `Policy`：`renewalStatus`、`assigneeUserId`、`riskTags[]`。
-- `FamilyInsight`：`sources`、`confidence`、`updatedAt` 等解释元数据。
-- `FamilyDocument`：`pending|success|needs_review|failed` + 人工校对元数据。
+B 端：
+- 家庭中心新增“家庭运营台”：按压力/风险/性价比查看家庭池。
+- 家庭中心新增“任务面板”：续保、低置信度复核、资料补齐任务处理。
 
-## 7. 核心扩展顺序（建议执行）
-1. 权限加固与审计日志基础层。
-2. 文档复核工作流（置信度 + 人工修正 + 回写）。
-3. B端家庭池与保单生命周期管理。
-4. 通知任务中心与运营指标看板。
-5. 基于真实数据再迭代高级AI能力。
+统一交互：
+- 基准数据过期/失败时，显示“最近快照时间 + 可能过期提示”，不阻断页面主流程。
 
-## 8. 验收与质量门禁（DoD）
-### 8.1 API与安全
-- 覆盖同租户可访问、跨租户拒绝、角色/资源权限校验。
+## 3.5 运维与审计
+- 每周定时拉取收入基准（Asia/Shanghai），失败回退最近快照。
+- 监控指标：
+  - benchmark 拉取成功率/延迟/最近成功时间
+  - value-analysis 耗时与失败率
+  - 低置信度任务生成率与处理时长
+- 审计事件：
+  - 续保状态变更
+  - 任务状态变更
+  - 人工复核提交
 
-### 8.2 业务端到端
-- C端链路：注册/登录 -> 成员维护 -> PDF导入 -> 洞察查看 -> 修正闭环。
-- B端链路：家庭池查看 -> 风险筛选 -> 续保处理 -> 状态更新。
+## 4. 测试与质量门禁
+API 与安全：
+- 同租户可访问。
+- 跨租户拒绝。
+- 角色越权拒绝。
+- 新接口契约稳定（benchmarks / broker families / value-analysis / tasks）。
 
-### 8.3 契约与稳定性
-- 核心接口契约测试，防止 Flutter 与 API 结构漂移。
-- 关键SLA监控：登录、列表查询、PDF识别耗时与失败率。
+评分与基准：
+- 5 个维度边界值。
+- 权重计算正确。
+- 缺失字段降级与低置信度任务触发正确。
+- 外部源成功/超时/异常/快照回退覆盖。
 
-## 9. 当前非目标
-- 以私有化深度定制作为首要驱动。
-- 在核心链路未稳定前做复杂外部生态集成。
-- 仅做视觉优化但不带来业务或质量增益。
+端到端：
+- C 端：导入保单 -> 生成报告 -> 查看年支出占比 -> 低置信度提示。
+- B 端：家庭池筛选 -> 打开低分家庭 -> 分配续保处理 -> 关闭任务。
 
-## 10. 使用规则
-- 新功能或重构需标注“对应本文件哪一节”。
-- 若与本基线冲突，先更新本文件再实施代码变更。
-- 本文件是项目初衷与MVP方向的单一事实来源（single source of truth）。
+## 5. 非目标（本期不做）
+- 跨产品实时比价引擎。
+- 私有化深度定制优先级提升（本期以 SaaS 为第一优先）。
+- 高耦合外部生态集成（先保障可运营、可审计、可回归）。
+
+## 6. 建议扩展（待审批）
+以下为建议项，默认“待你批准后排期”：
+1. 家庭预算护栏（Budget Guardrail）
+- 按家庭目标（保守/平衡/进取）给出“建议保费占比区间”，超出自动预警。
+
+2. 任务 SLA 分层
+- 为 `renewal_due` / `document_review` 等任务设置默认时限和超时升级策略（提醒 -> 升级 -> 指派）。
+
+3. 价值分可解释页（Explainability Trace）
+- 每个维度支持“字段来源 -> 规则命中 -> 扣分原因 -> 修正入口”一键追踪。
+
+4. 运营周报自动化
+- 自动生成租户维度周报：风险家庭变化、低置信度处理效率、续保闭环率。
+
+5. 评分版本灰度
+- 支持 `scoringVersion` 灰度发布与回滚，避免规则升级导致业务波动不可控。
+
+## 7. 执行规则
+- 新功能必须标注“对应本文哪个章节”。
+- 与本文冲突时，先更新本文，再实施代码变更。
+- 本文是项目初衷与二期MVP边界的唯一基线。

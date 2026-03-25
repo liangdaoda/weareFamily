@@ -40,6 +40,10 @@ interface DocumentRow {
   mime_type: string;
   file_size: number | string;
   doc_type: string;
+  review_status: string;
+  review_notes: string | null;
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
   uploaded_by_user_id: string;
   created_at: string;
 }
@@ -78,6 +82,10 @@ function mapDocument(row: DocumentRow): FamilyDocument {
     mimeType: row.mime_type,
     fileSize: Number(row.file_size ?? 0),
     docType: row.doc_type,
+    reviewStatus: row.review_status as FamilyDocument['reviewStatus'],
+    reviewNotes: row.review_notes,
+    reviewedByUserId: row.reviewed_by_user_id,
+    reviewedAt: row.reviewed_at,
     uploadedByUserId: row.uploaded_by_user_id,
     createdAt: row.created_at,
   };
@@ -196,6 +204,10 @@ export class FamilyRepository {
     mimeType: string;
     fileSize: number;
     docType?: string;
+    reviewStatus?: FamilyDocument['reviewStatus'];
+    reviewNotes?: string | null;
+    reviewedByUserId?: string | null;
+    reviewedAt?: string | null;
   }): Promise<FamilyDocument> {
     const payload: DocumentRow = {
       id: randomUUID(),
@@ -207,6 +219,10 @@ export class FamilyRepository {
       mime_type: input.mimeType,
       file_size: input.fileSize,
       doc_type: input.docType ?? 'policy-form',
+      review_status: input.reviewStatus ?? 'pending',
+      review_notes: input.reviewNotes ?? null,
+      reviewed_by_user_id: input.reviewedByUserId ?? null,
+      reviewed_at: input.reviewedAt ?? null,
       uploaded_by_user_id: ctx.userId,
       created_at: new Date().toISOString(),
     };

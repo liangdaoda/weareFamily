@@ -43,6 +43,15 @@ export interface FamilyInsight {
   householdScore: number;
   riskLevel: 'low' | 'medium' | 'high';
   summary: string;
+  annualPremiumTotal: number;
+  monthlyPremiumAvg: number;
+  premiumIncomeRatio: number;
+  benchmarkIncome: {
+    annual: number;
+    monthly: number;
+    currency: string;
+  };
+  benchmarkAsOf: string;
   policyCoverage: {
     medical: boolean;
     accident: boolean;
@@ -60,6 +69,8 @@ interface BuildFamilyInsightInput {
   locale: InsightLocale;
   members: FamilyMember[];
   policies: Policy[];
+  benchmarkAnnualIncome: number;
+  benchmarkAsOf: string;
 }
 
 interface SourceSeed {
@@ -106,6 +117,15 @@ export function buildFamilyInsight(input: BuildFamilyInsightInput): FamilyInsigh
   const members = input.members.map((member) => analyzeMember(input.locale, member, coverage));
   const householdScore = calculateHouseholdScore(members, coverage);
   const riskLevel: 'low' | 'medium' | 'high' = householdScore >= 75 ? 'low' : householdScore >= 55 ? 'medium' : 'high';
+  const annualPremiumTotal = roundToMoney(
+    input.policies.reduce((sum, policy) => sum + Number(policy.premium ?? 0), 0),
+  );
+  const monthlyPremiumAvg = roundToMoney(annualPremiumTotal / 12);
+  const benchmarkAnnualIncome = input.benchmarkAnnualIncome > 0 ? input.benchmarkAnnualIncome : 36000;
+  const benchmarkMonthlyIncome = roundToMoney(benchmarkAnnualIncome / 12);
+  const premiumIncomeRatio = benchmarkMonthlyIncome > 0
+    ? roundToRatio(monthlyPremiumAvg / benchmarkMonthlyIncome)
+    : 0;
 
   const gaps = evaluateFamilyGaps(input.locale, coverage, input.policies);
   const priorities = buildFamilyPriorities(input.locale, members, gaps);
@@ -118,6 +138,15 @@ export function buildFamilyInsight(input: BuildFamilyInsightInput): FamilyInsigh
     householdScore,
     riskLevel,
     summary,
+    annualPremiumTotal,
+    monthlyPremiumAvg,
+    premiumIncomeRatio,
+    benchmarkIncome: {
+      annual: roundToMoney(benchmarkAnnualIncome),
+      monthly: benchmarkMonthlyIncome,
+      currency: 'CNY',
+    },
+    benchmarkAsOf: input.benchmarkAsOf,
     policyCoverage: coverage,
     gaps,
     members,
@@ -536,4 +565,12 @@ function clamp(value: number, min: number, max: number): number {
 
 function roundToInt(value: number): number {
   return Math.round(value);
+}
+
+function roundToMoney(value: number): number {
+  return Number((Number.isFinite(value) ? value : 0).toFixed(2));
+}
+
+function roundToRatio(value: number): number {
+  return Number((Number.isFinite(value) ? value : 0).toFixed(4));
 }

@@ -2,8 +2,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:wearefamily_app/core/i18n/locale_text.dart';
-import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 
 class PreferencesSheet extends StatelessWidget {
   const PreferencesSheet({
@@ -42,15 +42,16 @@ class PreferencesSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: const Color(0xF21A2B42),
+            color: tokens.sheetBackground,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+            border: Border.all(color: tokens.cardBorder),
           ),
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -66,42 +67,53 @@ class PreferencesSheet extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
-                            ?.copyWith(color: Colors.white),
+                            ?.copyWith(color: tokens.textPrimary),
                       ),
                     ),
                     CupertinoButton(
                       minimumSize: const Size(30, 30),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Icon(CupertinoIcons.xmark_circle_fill,
-                          color: Colors.white54),
+                      child: Icon(
+                        CupertinoIcons.xmark_circle_fill,
+                        color: tokens.textTertiary,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                Text(context.tr('语言', 'Language'),
-                    style:
-                        const TextStyle(color: Colors.white70, fontSize: 13)),
+                Text(
+                  context.tr('语言', 'Language'),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 13),
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 _SegmentWrap(
                   child: CupertinoSlidingSegmentedControl<Locale>(
                     groupValue: locale.languageCode == 'en'
                         ? const Locale('en')
                         : const Locale('zh'),
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    thumbColor: Colors.white.withValues(alpha: 0.24),
+                    backgroundColor: tokens.accentSoftBg,
+                    thumbColor: tokens.accentBorder.withValues(alpha: 0.42),
                     children: {
-                      const Locale('zh'): const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        child:
-                            Text('中文', style: TextStyle(color: Colors.white)),
+                      const Locale('zh'): Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        child: Text(
+                          '中文',
+                          style: TextStyle(color: tokens.textPrimary),
+                        ),
                       ),
-                      const Locale('en'): const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        child: Text('English',
-                            style: TextStyle(color: Colors.white)),
+                      const Locale('en'): Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        child: Text(
+                          'English',
+                          style: TextStyle(color: tokens.textPrimary),
+                        ),
                       ),
                     },
                     onValueChanged: (value) {
@@ -115,33 +127,46 @@ class PreferencesSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Text(context.tr('主题', 'Theme'),
-                    style:
-                        const TextStyle(color: Colors.white70, fontSize: 13)),
+                Text(
+                  context.tr('主题', 'Theme'),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 13),
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 _SegmentWrap(
                   child: CupertinoSlidingSegmentedControl<ThemeMode>(
                     groupValue: themeMode,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    thumbColor: AppColors.accent.withValues(alpha: 0.8),
+                    backgroundColor: tokens.accentSoftBg,
+                    thumbColor: tokens.accent.withValues(alpha: 0.92),
                     children: {
                       ThemeMode.system: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 7),
-                        child: Text(context.tr('跟随系统', 'System'),
-                            style: const TextStyle(color: Colors.white)),
+                          horizontal: 8,
+                          vertical: 7,
+                        ),
+                        child: Text(
+                          context.tr('跟随系统', 'System'),
+                          style: TextStyle(color: tokens.textPrimary),
+                        ),
                       ),
                       ThemeMode.light: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 7),
-                        child: Text(context.tr('浅色', 'Light'),
-                            style: const TextStyle(color: Colors.white)),
+                          horizontal: 8,
+                          vertical: 7,
+                        ),
+                        child: Text(
+                          context.tr('浅色', 'Light'),
+                          style: TextStyle(color: tokens.textPrimary),
+                        ),
                       ),
                       ThemeMode.dark: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 7),
-                        child: Text(context.tr('深色', 'Dark'),
-                            style: const TextStyle(color: Colors.white)),
+                          horizontal: 8,
+                          vertical: 7,
+                        ),
+                        child: Text(
+                          context.tr('深色', 'Dark'),
+                          style: TextStyle(color: tokens.textPrimary),
+                        ),
                       ),
                     },
                     onValueChanged: (value) {

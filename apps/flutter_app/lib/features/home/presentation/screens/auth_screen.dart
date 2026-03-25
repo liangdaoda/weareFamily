@@ -8,6 +8,7 @@ import 'package:wearefamily_app/core/api/user_profile.dart';
 import 'package:wearefamily_app/core/i18n/locale_text.dart';
 import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 import 'package:wearefamily_app/shared/widgets/decorative_background.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
 import 'package:wearefamily_app/shared/widgets/preferences_sheet.dart';
@@ -177,6 +178,8 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final isRegister = _isRegister;
+    final tokens = context.visualTokens;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: DecorativeBackground(
@@ -198,8 +201,11 @@ class _AuthScreenState extends State<AuthScreen> {
                         minimumSize: const Size(30, 30),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         onPressed: _openPreferences,
-                        child: const Icon(CupertinoIcons.settings_solid,
-                            color: Colors.white70, size: 20),
+                        child: Icon(
+                          CupertinoIcons.settings_solid,
+                          color: tokens.textSecondary,
+                          size: 20,
+                        ),
                       ),
                     ),
                     _HeroHeader(isWide: isWide),
@@ -216,7 +222,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             style: Theme.of(context)
                                 .textTheme
                                 .titleLarge
-                                ?.copyWith(color: Colors.white),
+                                ?.copyWith(color: tokens.textPrimary),
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           _AuthModeToggle(
@@ -294,15 +300,21 @@ class _AuthScreenState extends State<AuthScreen> {
                                       const EdgeInsets.symmetric(vertical: 11),
                                   borderRadius: BorderRadius.circular(9),
                                   child: _loading
-                                      ? const CupertinoActivityIndicator(
-                                          radius: 9, color: AppColors.ink)
+                                      ? CupertinoActivityIndicator(
+                                          radius: 9,
+                                          color: isDark
+                                              ? Colors.white
+                                              : AppColors.ink,
+                                        )
                                       : Text(
                                           isRegister
                                               ? context.tr(
                                                   '注册并进入', 'Register & Enter')
                                               : context.tr('登录', 'Sign In'),
-                                          style: const TextStyle(
-                                            color: AppColors.ink,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? Colors.white
+                                                : AppColors.ink,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
@@ -315,10 +327,10 @@ class _AuthScreenState extends State<AuthScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 14, vertical: 11),
                                   borderRadius: BorderRadius.circular(9),
-                                  color: Colors.white.withValues(alpha: 0.14),
+                                  color: tokens.accentSoftBg,
                                   child: Text(
                                     context.tr('演示SSO', 'Demo SSO'),
-                                    style: const TextStyle(color: Colors.white),
+                                    style: TextStyle(color: tokens.textPrimary),
                                   ),
                                 ),
                               ],
@@ -330,7 +342,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             style: Theme.of(context)
                                 .textTheme
                                 .labelLarge
-                                ?.copyWith(color: Colors.white70),
+                                ?.copyWith(color: tokens.textSecondary),
                           ),
                         ],
                       ),
@@ -414,8 +426,10 @@ class _HeroHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle =
-        Theme.of(context).textTheme.displayLarge?.copyWith(color: Colors.white);
+    final tokens = context.visualTokens;
+    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
+          color: tokens.textPrimary,
+        );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,7 +449,7 @@ class _HeroHeader extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .bodyLarge
-                ?.copyWith(color: Colors.white70),
+                ?.copyWith(color: tokens.textSecondary),
           ),
         ).animate().fadeIn(duration: 520.ms, delay: 120.ms),
       ],
@@ -451,22 +465,23 @@ class _RoleToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     final locale = Localizations.localeOf(context);
 
     return CupertinoSlidingSegmentedControl<UserRole>(
       groupValue: role,
-      backgroundColor: Colors.white.withValues(alpha: 0.1),
-      thumbColor: Colors.white.withValues(alpha: 0.25),
+      backgroundColor: tokens.accentSoftBg,
+      thumbColor: tokens.accentBorder.withValues(alpha: 0.42),
       children: {
         UserRole.broker: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(UserRole.broker.displayNameFor(locale),
-              style: const TextStyle(color: Colors.white)),
+              style: TextStyle(color: tokens.textPrimary)),
         ),
         UserRole.consumer: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(UserRole.consumer.displayNameFor(locale),
-              style: const TextStyle(color: Colors.white)),
+              style: TextStyle(color: tokens.textPrimary)),
         ),
       },
       onValueChanged: (value) {
@@ -486,25 +501,28 @@ class _AuthModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final thumbTextColor = isDark ? Colors.white : AppColors.ink;
     return CupertinoSlidingSegmentedControl<bool>(
       groupValue: isRegister,
-      backgroundColor: Colors.white.withValues(alpha: 0.1),
-      thumbColor: AppColors.mint.withValues(alpha: 0.92),
+      backgroundColor: tokens.accentSoftBg,
+      thumbColor: tokens.accent.withValues(alpha: 0.92),
       children: {
         false: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(
             context.tr('登录', 'Login'),
-            style: const TextStyle(
-                color: AppColors.ink, fontWeight: FontWeight.w700),
+            style:
+                TextStyle(color: thumbTextColor, fontWeight: FontWeight.w700),
           ),
         ),
         true: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(
             context.tr('注册', 'Register'),
-            style: const TextStyle(
-                color: AppColors.ink, fontWeight: FontWeight.w700),
+            style:
+                TextStyle(color: thumbTextColor, fontWeight: FontWeight.w700),
           ),
         ),
       },
@@ -536,18 +554,21 @@ class _InputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final secondary = Theme.of(context).colorScheme.secondary;
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: onSurface),
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
-        prefixIcon: Icon(icon, color: Colors.white70, size: 18),
+        labelStyle: TextStyle(color: onSurface.withValues(alpha: 0.72)),
+        prefixIcon:
+            Icon(icon, color: onSurface.withValues(alpha: 0.72), size: 18),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.1),
+        fillColor: onSurface.withValues(alpha: 0.08),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(9),
           borderSide: BorderSide.none,
@@ -558,8 +579,8 @@ class _InputField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(9),
-          borderSide: BorderSide(
-              color: AppColors.accent.withValues(alpha: 0.8), width: 1.2),
+          borderSide:
+              BorderSide(color: secondary.withValues(alpha: 0.8), width: 1.2),
         ),
       ),
     );

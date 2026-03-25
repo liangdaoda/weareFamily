@@ -39,6 +39,7 @@ npm run codex:run:mysql
 ## Codex Commands
 - Start stack (PostgreSQL): `npm run codex:run`
 - Start stack (MySQL): `npm run codex:run:mysql`
+- Start backend + Flutter (Edge, save-to-hot-reload): `npm run dev:full`
 - Stop stack: `npm run stack:down`
 - API logs: `npm run stack:logs`
 
@@ -65,6 +66,18 @@ npm run codex:run:mysql
   - `AI_SCAN_TIMEOUT_MS=15000`
 - External service should return JSON fields:
   - `policyNo`, `insurerName`, `productName`, `premium`, `currency`, `startDate`, `endDate`, `aiRiskScore`, `aiNotes`
+
+## Income Benchmark Source
+- Default provider is National Bureau of Statistics (China):
+  - `BENCHMARK_PROVIDER=nbs`
+  - `BENCHMARK_NBS_ENDPOINT=https://data.stats.gov.cn/easyquery.htm`
+  - `BENCHMARK_NBS_DB_CODE=hgnd`
+  - `BENCHMARK_NBS_INDICATOR=A0A0101`
+- Default snapshot source tag:
+  - `BENCHMARK_SOURCE=nbs-hgnd-a0a0101`
+- Optional legacy URL mode:
+  - `BENCHMARK_PROVIDER=url`
+  - `BENCHMARK_INCOME_URL=https://your-endpoint`
 
 ## Family and PDF APIs
 - List families:

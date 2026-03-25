@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:wearefamily_app/core/api/api_client.dart';
 import 'package:wearefamily_app/core/api/user_profile.dart';
 import 'package:wearefamily_app/core/i18n/locale_text.dart';
-import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 import 'package:wearefamily_app/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:wearefamily_app/features/family/presentation/screens/family_center_screen.dart';
 import 'package:wearefamily_app/features/policies/presentation/screens/policies_screen.dart';
@@ -66,6 +66,7 @@ class _HomeShellState extends State<HomeShell> {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final tokens = context.visualTokens;
               final isWide = constraints.maxWidth >= 960;
               if (isWide) {
                 return Row(
@@ -85,8 +86,7 @@ class _HomeShellState extends State<HomeShell> {
                       onOpenPreferences: _openPreferences,
                       onLogout: widget.onLogout,
                     ),
-                    Container(
-                        width: 1, color: Colors.white.withValues(alpha: 0.16)),
+                    Container(width: 1, color: tokens.cardBorder),
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.md),
@@ -160,6 +160,7 @@ class _DesktopSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     final textTheme = Theme.of(context).textTheme;
 
     return SizedBox(
@@ -168,9 +169,9 @@ class _DesktopSidebar extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: tokens.cardBackground,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            border: Border.all(color: tokens.cardBorder),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -184,11 +185,14 @@ class _DesktopSidebar extends StatelessWidget {
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: AppColors.mint,
+                        color: Theme.of(context).colorScheme.secondary,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(CupertinoIcons.shield_fill,
-                          color: AppColors.ink, size: 18),
+                      child: Icon(
+                        CupertinoIcons.shield_fill,
+                        color: tokens.textPrimary,
+                        size: 18,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
@@ -199,12 +203,12 @@ class _DesktopSidebar extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: textTheme.bodyMedium
-                                  ?.copyWith(color: Colors.white)),
+                                  ?.copyWith(color: tokens.textPrimary)),
                           Text(profile.role.displayNameFor(locale),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: textTheme.bodySmall
-                                  ?.copyWith(color: Colors.white70)),
+                                  ?.copyWith(color: tokens.textSecondary)),
                         ],
                       ),
                     ),
@@ -237,8 +241,8 @@ class _DesktopSidebar extends StatelessWidget {
                   onPressed: onOpenPreferences,
                   child: Text(
                     context.tr('显示设置', 'Display settings'),
-                    style:
-                        textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: tokens.textSecondary),
                   ),
                 ),
                 CupertinoButton(
@@ -248,8 +252,8 @@ class _DesktopSidebar extends StatelessWidget {
                   onPressed: onLogout,
                   child: Text(
                     context.tr('退出登录', 'Sign out'),
-                    style:
-                        textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: tokens.textSecondary),
                   ),
                 ),
               ],
@@ -276,9 +280,9 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg =
-        selected ? Colors.white.withValues(alpha: 0.18) : Colors.transparent;
-    final fg = selected ? AppColors.accent : Colors.white70;
+    final tokens = context.visualTokens;
+    final bg = selected ? tokens.accentSoftBg : Colors.transparent;
+    final fg = selected ? tokens.accent : tokens.textSecondary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -324,6 +328,7 @@ class _MobileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
@@ -333,11 +338,14 @@ class _MobileHeader extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: AppColors.accent,
+              color: Theme.of(context).colorScheme.secondary,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(CupertinoIcons.shield_fill,
-                color: AppColors.ink, size: 18),
+            child: Icon(
+              CupertinoIcons.shield_fill,
+              color: tokens.textPrimary,
+              size: 18,
+            ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -348,14 +356,16 @@ class _MobileHeader extends StatelessWidget {
                   profile.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: tokens.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
                   profile.role.displayNameFor(locale),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 12),
                 ),
               ],
             ),
@@ -364,15 +374,21 @@ class _MobileHeader extends StatelessWidget {
             minimumSize: const Size(32, 32),
             padding: const EdgeInsets.symmetric(horizontal: 8),
             onPressed: onOpenPreferences,
-            child: const Icon(CupertinoIcons.settings_solid,
-                color: Colors.white70, size: 20),
+            child: Icon(
+              CupertinoIcons.settings_solid,
+              color: tokens.textSecondary,
+              size: 20,
+            ),
           ),
           CupertinoButton(
             minimumSize: const Size(32, 32),
             padding: const EdgeInsets.symmetric(horizontal: 8),
             onPressed: onLogout,
-            child: const Icon(CupertinoIcons.square_arrow_right,
-                color: Colors.white70, size: 20),
+            child: Icon(
+              CupertinoIcons.square_arrow_right,
+              color: tokens.textSecondary,
+              size: 20,
+            ),
           ),
         ],
       ),
@@ -397,22 +413,24 @@ class _MobileNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
+    final navBackground = tokens.sheetBackground.withValues(alpha: 0.94);
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+          top: BorderSide(color: tokens.cardBorder),
         ),
       ),
       child: CupertinoTheme(
         data: CupertinoTheme.of(context).copyWith(
-          barBackgroundColor: const Color(0xCC0E1A2B),
+          barBackgroundColor: navBackground,
         ),
         child: CupertinoTabBar(
           currentIndex: currentIndex,
           onTap: onChanged,
-          activeColor: AppColors.accent,
-          inactiveColor: Colors.white70,
-          backgroundColor: const Color(0xCC0E1A2B),
+          activeColor: tokens.accent,
+          inactiveColor: tokens.textSecondary,
+          backgroundColor: navBackground,
           iconSize: 20,
           items: [
             BottomNavigationBarItem(

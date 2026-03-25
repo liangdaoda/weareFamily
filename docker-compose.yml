@@ -1,5 +1,3 @@
-version: '3.9'
-
 # Default stack: API + PostgreSQL.
 services:
   api:
@@ -7,6 +5,9 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20-alpine}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -21,6 +22,16 @@ services:
       JWT_ISSUER: 'wearefamily-api'
       JWT_EXPIRES_IN: '12h'
       UPLOAD_DIR: /app/uploads
+      BENCHMARK_PROVIDER: nbs
+      BENCHMARK_NBS_ENDPOINT: https://data.stats.gov.cn/easyquery.htm
+      BENCHMARK_NBS_DB_CODE: hgnd
+      BENCHMARK_NBS_INDICATOR: A0A0101
+      BENCHMARK_SOURCE: nbs-hgnd-a0a0101
+      BENCHMARK_REGION: CN
+      BENCHMARK_CURRENCY: CNY
+      BENCHMARK_FETCH_INTERVAL_HOURS: 168
+      BENCHMARK_TIMEOUT_MS: 8000
+      BENCHMARK_DEFAULT_ANNUAL_INCOME: 36000
     ports:
       - '3000:3000'
     depends_on:
@@ -31,7 +42,7 @@ services:
 
   postgres:
     # PostgreSQL database container.
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-docker.m.daocloud.io/library/postgres:16-alpine}
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

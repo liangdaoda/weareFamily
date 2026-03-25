@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import { db } from '../../db/knex';
 import type { UserContext } from '../../types/user-context';
-import type { CreatePolicyInput, ListPoliciesInput, Policy } from './model';
+import type { CreatePolicyInput, ListPoliciesInput, Policy, PolicyRenewalStatus } from './model';
 
 interface PolicyRow {
   id: string;
@@ -20,6 +20,10 @@ interface PolicyRow {
   ai_risk_score: string | number | null;
   ai_notes: string | null;
   ai_payload: string | null;
+  renewal_status: string;
+  assignee_user_id: string | null;
+  lifecycle_note: string | null;
+  lifecycle_updated_at: string | null;
   created_by_user_id: string;
   created_at: string;
   updated_at: string;
@@ -57,10 +61,34 @@ function mapRow(row: PolicyRow): Policy {
     aiRiskScore: row.ai_risk_score === null ? null : Number(row.ai_risk_score),
     aiNotes: row.ai_notes,
     aiPayload: parseAiPayload(row.ai_payload),
+    renewalStatus: row.renewal_status as PolicyRenewalStatus,
+    assigneeUserId: row.assignee_user_id,
+    lifecycleNote: row.lifecycle_note,
+    lifecycleUpdatedAt: row.lifecycle_updated_at,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function resolveRenewalStatus(endDate: string | null): PolicyRenewalStatus {
+  if (!endDate) {
+    return 'not_due';
+  }
+  const parsed = new Date(endDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'not_due';
+  }
+
+  const now = new Date();
+  const diffDays = Math.ceil((parsed.getTime() - now.getTime()) / 86400000);
+  if (diffDays < 0) {
+    return 'expired';
+  }
+  if (diffDays <= 30) {
+    return 'due_soon';
+  }
+  return 'not_due';
 }
 
 export class PolicyRepository {
@@ -111,6 +139,10 @@ export class PolicyRepository {
       ai_risk_score: input.aiRiskScore ?? null,
       ai_notes: input.aiNotes ?? null,
       ai_payload: input.aiPayload ? JSON.stringify(input.aiPayload) : null,
+      renewal_status: resolveRenewalStatus(input.endDate ?? null),
+      assignee_user_id: null,
+      lifecycle_note: null,
+      lifecycle_updated_at: null,
       created_by_user_id: ctx.userId,
       created_at: now,
       updated_at: now,
@@ -166,5 +198,38 @@ export class PolicyRepository {
 
       return deleted > 0;
     });
+  }
+
+  async updateLifecycle(
+    ctx: UserContext,
+    policyId: string,
+    input: {
+      renewalStatus: PolicyRenewalStatus;
+      assigneeUserId?: string | null;
+      lifecycleNote?: string | null;
+    },
+  ): Promise<Policy | null> {
+    const now = new Date().toISOString();
+
+    const updatedCount = await db<PolicyRow>('policies')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('id', policyId)
+      .update({
+        renewal_status: input.renewalStatus,
+        assignee_user_id: input.assigneeUserId ?? null,
+        lifecycle_note: input.lifecycleNote ?? null,
+        lifecycle_updated_at: now,
+        updated_at: now,
+      });
+
+    if (updatedCount === 0) {
+      return null;
+    }
+
+    const row = await db<PolicyRow>('policies')
+      .where('tenant_id', ctx.tenantId)
+      .andWhere('id', policyId)
+      .first();
+    return row ? mapRow(row) : null;
   }
 }

@@ -11,11 +11,18 @@
     "api:build": "npm --workspace apps/api run build",
     "api:start": "npm --workspace apps/api run start",
     "api:migrate": "npm --workspace apps/api run db:migrate",
+    "flutter:pub:get": "cd apps/flutter_app && flutter pub get",
+    "flutter:dev": "cd apps/flutter_app && flutter run -d edge --dart-define=API_BASE_URL=http://localhost:3000",
+    "flutter:dev:auto": "node scripts/flutter-dev-auto-reload.js",
+    "dev:full": "concurrently -k -n backend,flutter -c yellow,cyan \"npm run stack:up\" \"npm run flutter:dev:auto\"",
     "stack:up": "docker compose up --build",
     "stack:up:mysql": "docker compose -f docker-compose.yml -f docker-compose.mysql.yml up --build",
     "stack:down": "docker compose down -v",
     "stack:logs": "docker compose logs -f api",
     "codex:run": "npm run stack:up",
     "codex:run:mysql": "npm run stack:up:mysql"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

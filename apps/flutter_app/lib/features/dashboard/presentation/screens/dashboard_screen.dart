@@ -5,8 +5,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:wearefamily_app/core/api/api_client.dart';
 import 'package:wearefamily_app/core/api/user_profile.dart';
 import 'package:wearefamily_app/core/i18n/locale_text.dart';
-import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 import 'package:wearefamily_app/features/policies/presentation/screens/policies_screen.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
 
@@ -20,23 +20,23 @@ class DashboardScreen extends StatelessWidget {
   final UserProfile profile;
   final ApiClient apiClient;
 
-  static const double _nationalMonthlyIncome = 3000;
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<DashboardSummary>(
       future: apiClient.fetchDashboardSummary(profile),
       builder: (context, snapshot) {
+        final tokens = context.visualTokens;
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CircularProgressIndicator(color: AppColors.accent));
+          return Center(
+            child: CircularProgressIndicator(color: tokens.accent),
+          );
         }
 
         if (snapshot.hasError) {
           return Center(
             child: Text(
               '${context.tr('加载失败', 'Load failed')}: ${snapshot.error}',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: tokens.textSecondary),
             ),
           );
         }
@@ -45,12 +45,13 @@ class DashboardScreen extends StatelessWidget {
         if (summary == null) {
           return Center(
             child: Text(context.tr('暂无数据', 'No data'),
-                style: const TextStyle(color: Colors.white70)),
+                style: TextStyle(color: tokens.textSecondary)),
           );
         }
 
-        final monthlyPremium = summary.metrics.premiumTotal / 12.0;
-        final premiumRatio = monthlyPremium / _nationalMonthlyIncome;
+        final monthlyPremium = summary.metrics.monthlyPremium;
+        final premiumRatio = summary.metrics.premiumIncomeRatio;
+        final benchmarkMonthlyIncome = summary.benchmark.monthlyIncome;
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -94,7 +95,7 @@ class DashboardScreen extends StatelessWidget {
                     style: Theme.of(context)
                         .textTheme
                         .displayMedium
-                        ?.copyWith(color: Colors.white),
+                        ?.copyWith(color: tokens.textPrimary),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
@@ -103,8 +104,21 @@ class DashboardScreen extends StatelessWidget {
                     style: Theme.of(context)
                         .textTheme
                         .bodyMedium
-                        ?.copyWith(color: Colors.white70),
+                        ?.copyWith(color: tokens.textSecondary),
                   ),
+                  if (summary.benchmark.stale) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      context.tr(
+                        '收入基准数据可能过期，当前使用最近快照。',
+                        'Benchmark data may be stale. Using latest snapshot.',
+                      ),
+                      style: TextStyle(
+                        color: tokens.warning,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                   if (summary.metrics.expiringSoon > 0) ...[
                     const SizedBox(height: AppSpacing.md),
                     _ExpiryAlertBanner(
@@ -156,6 +170,7 @@ class DashboardScreen extends StatelessWidget {
                           child: _IncomeBarCard(
                             monthlyPremium: monthlyPremium,
                             premiumRatio: premiumRatio,
+                            benchmarkMonthlyIncome: benchmarkMonthlyIncome,
                           ),
                         ),
                       ],
@@ -165,8 +180,10 @@ class DashboardScreen extends StatelessWidget {
                         summary: summary, premiumRatio: premiumRatio),
                     const SizedBox(height: AppSpacing.lg),
                     _IncomeBarCard(
-                        monthlyPremium: monthlyPremium,
-                        premiumRatio: premiumRatio),
+                      monthlyPremium: monthlyPremium,
+                      premiumRatio: premiumRatio,
+                      benchmarkMonthlyIncome: benchmarkMonthlyIncome,
+                    ),
                   ],
                 ],
               ),
@@ -189,6 +206,7 @@ class _ExpiryAlertBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     final locale = Localizations.localeOf(context).languageCode.toLowerCase();
     final isChinese = locale.startsWith('zh');
 
@@ -200,14 +218,14 @@ class _ExpiryAlertBanner extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            gradient: const LinearGradient(
-              colors: [Color(0xFFF55A3C), Color(0xFFFF9A5F)],
+            gradient: LinearGradient(
+              colors: [tokens.danger, tokens.warning],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x66F55A3C),
+                color: tokens.danger.withValues(alpha: 0.4),
                 blurRadius: 20,
                 offset: Offset(0, 10),
               ),
@@ -217,8 +235,8 @@ class _ExpiryAlertBanner extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                const Icon(Icons.notification_important_rounded,
-                    color: Colors.white),
+                Icon(Icons.notification_important_rounded,
+                    color: tokens.textPrimary),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
@@ -226,7 +244,7 @@ class _ExpiryAlertBanner extends StatelessWidget {
                         ? '你有 $expiringSoonCount 份保单将在30天内到期，点击查看并处理续保。'
                         : '$expiringSoonCount policies expire within 30 days. Tap to review renewals.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white,
+                          color: tokens.textPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
@@ -236,13 +254,13 @@ class _ExpiryAlertBanner extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: tokens.accentSoftBg,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
                     context.tr('立即查看', 'Review now'),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: Colors.white,
+                          color: tokens.textPrimary,
                           fontWeight: FontWeight.w700,
                         ),
                   ),
@@ -275,6 +293,7 @@ class _PolicySummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +303,7 @@ class _PolicySummaryCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           LayoutBuilder(
@@ -356,8 +375,9 @@ class _PolicyMetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return Material(
-      color: Colors.white.withValues(alpha: 0.06),
+      color: tokens.cardBackground.withValues(alpha: 0.7),
       borderRadius: BorderRadius.circular(9),
       child: InkWell(
         borderRadius: BorderRadius.circular(9),
@@ -368,8 +388,12 @@ class _PolicyMetricTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: Colors.white.withValues(alpha: 0.12),
-                child: Icon(icon, color: AppColors.accent, size: 18),
+                backgroundColor: tokens.accentSoftBg,
+                child: Icon(
+                  icon,
+                  color: tokens.accent,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -377,8 +401,8 @@ class _PolicyMetricTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(label,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 12)),
+                        style: TextStyle(
+                            color: tokens.textSecondary, fontSize: 12)),
                     const SizedBox(height: 4),
                     _AnimatedMetricValue(
                       value: value,
@@ -386,12 +410,12 @@ class _PolicyMetricTile extends StatelessWidget {
                       style: Theme.of(context)
                           .textTheme
                           .titleLarge
-                          ?.copyWith(color: Colors.white),
+                          ?.copyWith(color: tokens.textPrimary),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+              Icon(Icons.chevron_right, color: tokens.textTertiary, size: 18),
             ],
           ),
         ),
@@ -407,6 +431,7 @@ class _PremiumSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,7 +441,7 @@ class _PremiumSummaryCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           _AnimatedMetricValue(
@@ -425,7 +450,7 @@ class _PremiumSummaryCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .displaySmall
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
@@ -433,7 +458,7 @@ class _PremiumSummaryCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .bodySmall
-                ?.copyWith(color: Colors.white70),
+                ?.copyWith(color: tokens.textSecondary),
           ),
         ],
       ),
@@ -480,6 +505,7 @@ class _RiskRadarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     final coverage = _safeRatio(
         summary.metrics.activePolicies, summary.metrics.totalPolicies);
     final renewalPressure =
@@ -498,7 +524,7 @@ class _RiskRadarCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
@@ -507,8 +533,8 @@ class _RiskRadarCard extends StatelessWidget {
               RadarChartData(
                 dataSets: [
                   RadarDataSet(
-                    borderColor: AppColors.accent,
-                    fillColor: AppColors.accent.withValues(alpha: 0.25),
+                    borderColor: tokens.chartPrimary,
+                    fillColor: tokens.chartPrimary.withValues(alpha: 0.25),
                     entryRadius: 2,
                     dataEntries: values
                         .map((value) =>
@@ -518,12 +544,13 @@ class _RiskRadarCard extends StatelessWidget {
                 ],
                 radarBackgroundColor: Colors.transparent,
                 borderData: FlBorderData(show: false),
-                radarBorderData: const BorderSide(color: Colors.white24),
+                radarBorderData: BorderSide(color: tokens.chartGrid),
                 titleTextStyle:
-                    const TextStyle(color: Colors.white70, fontSize: 12),
-                tickBorderData: const BorderSide(color: Colors.white12),
-                ticksTextStyle:
-                    const TextStyle(color: Colors.white38, fontSize: 10),
+                    TextStyle(color: tokens.chartLabel, fontSize: 12),
+                tickBorderData: BorderSide(color: tokens.chartGrid),
+                ticksTextStyle: TextStyle(
+                    color: tokens.chartLabel.withValues(alpha: 0.7),
+                    fontSize: 10),
                 titlePositionPercentageOffset: 0.16,
                 getTitle: (index, angle) {
                   switch (index) {
@@ -546,7 +573,7 @@ class _RiskRadarCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             '风险指数 ${_formatPercent(riskIndex)} · 保费负担 ${_formatPercent(premiumPressure)}',
-            style: const TextStyle(color: Colors.white70),
+            style: TextStyle(color: tokens.textSecondary),
           ),
         ],
       ),
@@ -574,13 +601,16 @@ class _IncomeBarCard extends StatelessWidget {
   const _IncomeBarCard({
     required this.monthlyPremium,
     required this.premiumRatio,
+    required this.benchmarkMonthlyIncome,
   });
 
   final double monthlyPremium;
   final double premiumRatio;
+  final double benchmarkMonthlyIncome;
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     final ratioText = (premiumRatio * 100).toStringAsFixed(1);
 
     return GlassCard(
@@ -592,12 +622,12 @@ class _IncomeBarCard extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: Colors.white),
+                ?.copyWith(color: tokens.textPrimary),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            '用户月均保费占全国月均收入的 $ratioText%',
-            style: const TextStyle(color: Colors.white70),
+            '用户月均保费占基准月收入的 $ratioText%',
+            style: TextStyle(color: tokens.textSecondary),
           ),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
@@ -623,8 +653,8 @@ class _IncomeBarCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             '对比',
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 12),
+                            style: TextStyle(
+                                color: tokens.textSecondary, fontSize: 12),
                           ),
                         );
                       },
@@ -637,16 +667,16 @@ class _IncomeBarCard extends StatelessWidget {
                     barsSpace: 12,
                     barRods: [
                       BarChartRodData(
-                        toY: _IncomeBarCard._nationalIncome,
+                        toY: benchmarkMonthlyIncome,
                         width: 18,
                         borderRadius: BorderRadius.circular(6),
-                        color: AppColors.mint,
+                        color: tokens.chartReference,
                       ),
                       BarChartRodData(
                         toY: monthlyPremium,
                         width: 18,
                         borderRadius: BorderRadius.circular(6),
-                        color: AppColors.accent,
+                        color: tokens.chartPrimary,
                       ),
                     ],
                   ),
@@ -656,10 +686,15 @@ class _IncomeBarCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Row(
-            children: const [
-              _LegendDot(color: AppColors.mint, label: '全国月均收入'),
-              SizedBox(width: AppSpacing.md),
-              _LegendDot(color: AppColors.accent, label: '用户月均保费'),
+            children: [
+              Text(
+                '${context.tr('基准月收入', 'Benchmark monthly income')}: ${benchmarkMonthlyIncome.toStringAsFixed(2)}',
+                style: TextStyle(color: tokens.textSecondary, fontSize: 11),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _LegendDot(color: tokens.chartReference, label: 'Benchmark'),
+              const SizedBox(width: AppSpacing.md),
+              _LegendDot(color: tokens.chartPrimary, label: 'Premium'),
             ],
           ),
         ],
@@ -668,11 +703,10 @@ class _IncomeBarCard extends StatelessWidget {
   }
 
   double _maxY(double premium) {
-    final base = _nationalIncome > premium ? _nationalIncome : premium;
+    final base =
+        benchmarkMonthlyIncome > premium ? benchmarkMonthlyIncome : premium;
     return base * 1.25;
   }
-
-  static const double _nationalIncome = DashboardScreen._nationalMonthlyIncome;
 }
 
 class _LegendDot extends StatelessWidget {
@@ -695,7 +729,10 @@ class _LegendDot extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            style: TextStyle(
+              color: context.visualTokens.textSecondary,
+              fontSize: 12,
+            )),
       ],
     );
   }

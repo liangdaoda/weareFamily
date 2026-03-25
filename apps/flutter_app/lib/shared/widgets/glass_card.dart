@@ -2,6 +2,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 
 class GlassCard extends StatelessWidget {
   const GlassCard({
@@ -15,16 +16,28 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRRect(
       borderRadius: BorderRadius.circular(9),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(
+          sigmaX: isDark ? 12 : 8,
+          sigmaY: isDark ? 12 : 8,
+        ),
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.1),
+            color: tokens.cardBackground,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            border: Border.all(color: tokens.cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: tokens.cardShadow,
+                blurRadius: isDark ? 18 : 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: child,
         ),

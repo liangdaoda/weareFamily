@@ -2,6 +2,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import { db } from '../../db/knex';
+import { IncomeBenchmarkService } from '../benchmarks/service';
 
 interface PolicyRow {
   id: string;
@@ -17,6 +18,8 @@ function daysBetween(start: Date, end: Date): number {
 }
 
 const dashboardRoutes: FastifyPluginAsync = async (app) => {
+  const benchmarkService = new IncomeBenchmarkService({ logger: app.log });
+
   app.get('/summary', async (request) => {
     const ctx = request.userContext;
 
@@ -39,16 +42,33 @@ const dashboardRoutes: FastifyPluginAsync = async (app) => {
       return diff >= 0 && diff <= 30;
     }).length;
     const premiumTotal = rows.reduce((sum, row) => sum + Number(row.premium ?? 0), 0);
+    const currentBenchmark = await benchmarkService.refreshIfStale(false);
+    const benchmarkAnnualIncome = currentBenchmark.snapshot.annualIncome;
+    const benchmarkMonthlyIncome = benchmarkAnnualIncome / 12;
+    const monthlyPremium = premiumTotal / 12;
+    const premiumIncomeRatio = benchmarkMonthlyIncome > 0
+      ? Number((monthlyPremium / benchmarkMonthlyIncome).toFixed(4))
+      : 0;
 
     return {
       tenantId: ctx.tenantId,
       role: ctx.role,
       tenantMode: ctx.tenantMode,
+      benchmark: {
+        annualIncome: benchmarkAnnualIncome,
+        monthlyIncome: Number(benchmarkMonthlyIncome.toFixed(2)),
+        currency: currentBenchmark.snapshot.currency,
+        source: currentBenchmark.snapshot.source,
+        asOf: currentBenchmark.snapshot.fetchedAt,
+        stale: currentBenchmark.stale,
+      },
       metrics: {
         totalPolicies: rows.length,
         activePolicies,
         expiringSoon,
         premiumTotal,
+        monthlyPremium: Number(monthlyPremium.toFixed(2)),
+        premiumIncomeRatio,
       },
     };
   });

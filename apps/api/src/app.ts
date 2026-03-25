@@ -4,10 +4,13 @@ import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import authRoutes from './modules/auth/routes';
+import benchmarkRoutes from './modules/benchmarks/routes';
+import brokerRoutes from './modules/broker/routes';
 import dashboardRoutes from './modules/dashboard/routes';
 import familyRoutes from './modules/families/routes';
 import healthRoutes from './modules/health/routes';
 import policyRoutes from './modules/policies/routes';
+import taskRoutes from './modules/tasks/routes';
 import authContextPlugin from './plugins/auth-context';
 import { env } from './config/env';
 
@@ -38,8 +41,11 @@ export function buildApp(): FastifyInstance {
   app.register(healthRoutes);
   app.register(authRoutes, { prefix: '/api/v1/auth' });
   app.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
+  app.register(benchmarkRoutes, { prefix: '/api/v1/benchmarks' });
+  app.register(brokerRoutes, { prefix: '/api/v1/broker' });
   app.register(familyRoutes, { prefix: '/api/v1/families' });
   app.register(policyRoutes, { prefix: '/api/v1/policies' });
+  app.register(taskRoutes, { prefix: '/api/v1/tasks' });
 
   app.setErrorHandler((error, request, reply) => {
     // Normalize unknown error into safe response payload.

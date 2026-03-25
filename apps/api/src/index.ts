@@ -5,6 +5,7 @@ import { buildApp } from './app';
 import { env } from './config/env';
 import { db, pingDatabase } from './db/knex';
 import { runMigrations } from './db/migrate';
+import { IncomeBenchmarkService, startIncomeBenchmarkScheduler } from './modules/benchmarks/service';
 
 const maxDbAttempts = 10;
 const dbRetryDelayMs = 2000;
@@ -47,6 +48,14 @@ async function startServer(): Promise<void> {
     await runMigrations();
   }
 
+  const benchmarkService = new IncomeBenchmarkService({ logger: app.log });
+  await benchmarkService.refreshIfStale(false);
+  const benchmarkTimer = startIncomeBenchmarkScheduler(benchmarkService, {
+    onError: (error) => {
+      app.log.warn({ err: error as Error }, 'Income benchmark scheduler run failed.');
+    },
+  });
+
   const address = await app.listen({ host: env.host, port: env.port });
   app.log.info({ address }, 'API server started.');
 
@@ -57,6 +66,9 @@ async function startServer(): Promise<void> {
     }
     shuttingDown = true;
     app.log.info({ signal }, 'Shutting down API server.');
+    if (benchmarkTimer) {
+      clearInterval(benchmarkTimer);
+    }
     await app.close();
     await db.destroy();
     process.exit(0);

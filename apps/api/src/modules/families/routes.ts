@@ -6,9 +6,12 @@ import path from 'node:path';
 import type { FastifyPluginAsync } from 'fastify';
 
 import { env } from '../../config/env';
+import { IncomeBenchmarkService } from '../benchmarks/service';
 import { PolicyRepository } from '../policies/repository';
 import { buildPolicyAiOutput, resolveInsightLocale } from '../policies/insight';
 import { scanPolicyFromPdf } from '../policies/scan';
+import { OpsTaskRepository } from '../tasks/repository';
+import { PolicyValueAnalysisService } from '../value-analysis/service';
 import { buildFamilyInsight } from './insight';
 import { FamilyRepository } from './repository';
 import type { CreateFamilyMemberInput, UpdateFamilyMemberInput } from './model';
@@ -57,6 +60,20 @@ function looksLikePolicy(scan: Awaited<ReturnType<typeof scanPolicyFromPdf>>): b
   return coreScore >= 2 && totalScore >= 3;
 }
 
+function calculateExtractionConfidence(scan: Awaited<ReturnType<typeof scanPolicyFromPdf>>): number {
+  const checkpoints = [
+    Boolean(scan.policyNo && !scan.policyNo.startsWith('AUTO-')),
+    Boolean(scan.insurerName && scan.insurerName !== '未知保险公司'),
+    Boolean(scan.productName && scan.productName !== '未识别产品'),
+    scan.premium > 0,
+    Boolean(scan.startDate && /^\d{4}-\d{2}-\d{2}$/.test(scan.startDate)),
+    Array.isArray(scan.coverageItems) && scan.coverageItems.length > 0,
+  ];
+
+  const hit = checkpoints.filter(Boolean).length;
+  return Number((hit / checkpoints.length).toFixed(2));
+}
+
 async function removeStoredFile(storagePath: string): Promise<void> {
   const filePath = path.join(env.uploadDir, sanitizeFilename(storagePath));
   try {
@@ -73,6 +90,9 @@ async function removeStoredFile(storagePath: string): Promise<void> {
 const familyRoutes: FastifyPluginAsync = async (app) => {
   const repository = new FamilyRepository();
   const policyRepository = new PolicyRepository();
+  const benchmarkService = new IncomeBenchmarkService({ logger: app.log });
+  const valueService = new PolicyValueAnalysisService();
+  const taskRepository = new OpsTaskRepository();
 
   app.get('/', async (request) => {
     const items = await repository.listFamilies(request.userContext);
@@ -98,9 +118,10 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const locale = resolveInsightLocale(request.headers);
-    const [members, policies] = await Promise.all([
+    const [members, policies, benchmark] = await Promise.all([
       repository.listMembers(request.userContext, familyId),
       policyRepository.listPoliciesByFamily(request.userContext, familyId),
+      benchmarkService.refreshIfStale(false),
     ]);
 
     const insight = buildFamilyInsight({
@@ -108,6 +129,8 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
       locale,
       members,
       policies,
+      benchmarkAnnualIncome: benchmark.snapshot.annualIncome,
+      benchmarkAsOf: benchmark.snapshot.fetchedAt,
     });
     return insight;
   });
@@ -222,6 +245,7 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
     const buffer = await file.toBuffer();
     const scan = await scanPolicyFromPdf(buffer, file.filename || 'policy.pdf');
     const locale = resolveInsightLocale(request.headers);
+    const extractionConfidence = calculateExtractionConfidence(scan);
 
     if (!looksLikePolicy(scan)) {
       return reply.code(400).send({
@@ -294,6 +318,20 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
+    const benchmark = await benchmarkService.refreshIfStale(false);
+    const valueAnalysis = await valueService.refreshForPolicy({
+      ctx: request.userContext,
+      policy: createdPolicy,
+      annualIncome: benchmark.snapshot.annualIncome,
+      locale,
+      triggerUserId: request.userContext.userId,
+    });
+
+    const reviewStatus: 'needs_review' | 'success' =
+      extractionConfidence < 0.65 || valueAnalysis.valueConfidence < 0.65
+      ? 'needs_review'
+      : 'success';
+
     const created = await repository.createDocument(request.userContext, {
       familyId,
       policyId: policyId ?? createdPolicy.id,
@@ -302,7 +340,47 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
       mimeType: file.mimetype || 'application/pdf',
       fileSize: buffer.length,
       docType,
+      reviewStatus,
+      reviewNotes: reviewStatus === 'needs_review'
+        ? '自动识别置信度较低，建议人工复核。'
+        : '自动识别通过。',
+      reviewedByUserId: reviewStatus === 'success' ? request.userContext.userId : null,
+      reviewedAt: reviewStatus === 'success' ? new Date().toISOString() : null,
     });
+
+    if (reviewStatus === 'needs_review') {
+      await taskRepository.createIfNotOpen({
+        tenantId: request.userContext.tenantId,
+        familyId,
+        policyId: createdPolicy.id,
+        documentId: created.id,
+        taskType: 'document_review',
+        priority: 'high',
+        title: '保单PDF识别待复核',
+        description: '文档抽取结果置信度较低，请人工核对关键信息。',
+        payload: {
+          documentId: created.id,
+          extractionConfidence,
+          valueConfidence: valueAnalysis.valueConfidence,
+        },
+        createdByUserId: request.userContext.userId,
+        dueAt: new Date(Date.now() + 86400000).toISOString(),
+      });
+    }
+
+    if (createdPolicy.renewalStatus === 'due_soon') {
+      await taskRepository.createIfNotOpen({
+        tenantId: request.userContext.tenantId,
+        familyId,
+        policyId: createdPolicy.id,
+        taskType: 'renewal_due',
+        priority: 'high',
+        title: '保单进入30天续保窗口',
+        description: '建议尽快处理续保并复核责任条款变化。',
+        createdByUserId: request.userContext.userId,
+        dueAt: createdPolicy.endDate,
+      });
+    }
 
     return reply.code(201).send({
       document: created,
@@ -311,6 +389,14 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
         aiRiskScore: responseAi.aiRiskScore,
         aiNotes: responseAi.aiNotes,
         aiInsight: responseAi.aiInsight,
+        valueScore: valueAnalysis.valueScore,
+        valueConfidence: valueAnalysis.valueConfidence,
+        valueSummary: valueAnalysis.summary,
+        valueDimensions: valueAnalysis.dimensions,
+        valueReasons: valueAnalysis.reasons,
+        valueRecommendations: valueAnalysis.recommendations,
+        valueScoringVersion: valueAnalysis.scoringVersion,
+        valueNeedsReview: valueAnalysis.valueConfidence < 0.65,
       },
       scan: {
         source: scan.source,
@@ -322,6 +408,8 @@ const familyRoutes: FastifyPluginAsync = async (app) => {
         startDate: scan.startDate,
         endDate: scan.endDate,
         coverageItems: responseAi.aiInsight.coverageItems,
+        extractionConfidence,
+        reviewStatus,
       },
     });
   });

@@ -6,6 +6,7 @@ import 'package:wearefamily_app/core/api/api_client.dart';
 import 'package:wearefamily_app/core/api/user_profile.dart';
 import 'package:wearefamily_app/core/theme/app_colors.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 import 'package:wearefamily_app/shared/widgets/decorative_background.dart';
 import 'package:wearefamily_app/shared/widgets/glass_card.dart';
 
@@ -51,6 +52,8 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -60,9 +63,9 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('新建保单', style: TextStyle(color: Colors.white)),
+        foregroundColor: tokens.textPrimary,
+        iconTheme: IconThemeData(color: tokens.textPrimary),
+        title: Text('新建保单', style: TextStyle(color: tokens.textPrimary)),
       ),
       body: DecorativeBackground(
         child: LayoutBuilder(
@@ -81,23 +84,23 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
               future: widget.apiClient.fetchFamilies(widget.profile),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                      child:
-                          CircularProgressIndicator(color: AppColors.accent));
+                  return Center(
+                    child: CircularProgressIndicator(color: tokens.accent),
+                  );
                 }
 
                 if (snapshot.hasError) {
                   return Center(
                     child: Text('加载家庭失败: ${snapshot.error}',
-                        style: const TextStyle(color: Colors.white70)),
+                        style: TextStyle(color: tokens.textSecondary)),
                   );
                 }
 
                 final families = snapshot.data ?? [];
                 if (families.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text('请先创建家庭档案后再添加保单。',
-                        style: TextStyle(color: Colors.white70)),
+                        style: TextStyle(color: tokens.textSecondary)),
                   );
                 }
 
@@ -115,7 +118,7 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .headlineSmall
-                              ?.copyWith(color: Colors.white),
+                              ?.copyWith(color: tokens.textPrimary),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
@@ -123,7 +126,7 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
-                              ?.copyWith(color: Colors.white70),
+                              ?.copyWith(color: tokens.textSecondary),
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         GlassCard(
@@ -134,7 +137,7 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               const SizedBox(height: AppSpacing.sm),
                               DropdownButtonFormField<String>(
                                 initialValue: _familyId,
-                                decoration: _inputDecoration('所属家庭'),
+                                decoration: _inputDecoration(context, '所属家庭'),
                                 items: families
                                     .map((family) => DropdownMenuItem(
                                           value: family.id,
@@ -149,22 +152,22 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               const SizedBox(height: AppSpacing.sm),
                               TextFormField(
                                 controller: _policyNoController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration('保单号'),
+                                style: TextStyle(color: tokens.textPrimary),
+                                decoration: _inputDecoration(context, '保单号'),
                                 validator: _requiredValidator('保单号'),
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               TextFormField(
                                 controller: _insurerController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration('保险公司'),
+                                style: TextStyle(color: tokens.textPrimary),
+                                decoration: _inputDecoration(context, '保险公司'),
                                 validator: _requiredValidator('保险公司'),
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               TextFormField(
                                 controller: _productController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration('产品名称'),
+                                style: TextStyle(color: tokens.textPrimary),
+                                decoration: _inputDecoration(context, '产品名称'),
                                 validator: _requiredValidator('产品名称'),
                               ),
                               const SizedBox(height: AppSpacing.lg),
@@ -172,21 +175,23 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               const SizedBox(height: AppSpacing.sm),
                               TextFormField(
                                 controller: _premiumController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration('年缴保费（数字）'),
+                                style: TextStyle(color: tokens.textPrimary),
+                                decoration:
+                                    _inputDecoration(context, '年缴保费（数字）'),
                                 keyboardType: TextInputType.number,
                                 validator: _premiumValidator,
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               TextFormField(
                                 controller: _currencyController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration('币种（默认 CNY）'),
+                                style: TextStyle(color: tokens.textPrimary),
+                                decoration:
+                                    _inputDecoration(context, '币种（默认 CNY）'),
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               DropdownButtonFormField<String>(
                                 initialValue: _status,
-                                decoration: _inputDecoration('状态'),
+                                decoration: _inputDecoration(context, '状态'),
                                 items: const [
                                   DropdownMenuItem(
                                       value: 'active', child: Text('生效中')),
@@ -220,8 +225,9 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                               const SizedBox(height: AppSpacing.sm),
                               TextFormField(
                                 controller: _notesController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration('补充说明（选填）'),
+                                style: TextStyle(color: tokens.textPrimary),
+                                decoration:
+                                    _inputDecoration(context, '补充说明（选填）'),
                                 maxLines: 3,
                               ),
                             ],
@@ -240,17 +246,21 @@ class _PolicyCreateScreenState extends State<PolicyCreateScreen> {
                           child: ElevatedButton(
                             onPressed: _submitting ? null : _handleSubmit,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.ink,
+                              backgroundColor: tokens.accent,
+                              foregroundColor:
+                                  isDark ? Colors.white : AppColors.ink,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(9)),
                             ),
                             child: _submitting
-                                ? const SizedBox(
+                                ? SizedBox(
                                     height: 18,
                                     width: 18,
                                     child: CircularProgressIndicator(
+                                        color: isDark
+                                            ? Colors.white
+                                            : AppColors.ink,
                                         strokeWidth: 2),
                                   )
                                 : const Text('保存保单'),
@@ -387,12 +397,13 @@ class _DateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return TextFormField(
       controller: controller,
       readOnly: true,
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDecoration(label).copyWith(
-        suffixIcon: const Icon(CupertinoIcons.calendar, color: Colors.white70),
+      style: TextStyle(color: tokens.textPrimary),
+      decoration: _inputDecoration(context, label).copyWith(
+        suffixIcon: Icon(CupertinoIcons.calendar, color: tokens.textSecondary),
       ),
       validator: validator,
       onTap: onPick,
@@ -407,22 +418,24 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return Text(
       title,
       style: Theme.of(context)
           .textTheme
           .titleMedium
-          ?.copyWith(color: Colors.white),
+          ?.copyWith(color: tokens.textPrimary),
     );
   }
 }
 
-InputDecoration _inputDecoration(String label) {
+InputDecoration _inputDecoration(BuildContext context, String label) {
+  final tokens = context.visualTokens;
   return InputDecoration(
     labelText: label,
-    labelStyle: const TextStyle(color: Colors.white70),
+    labelStyle: TextStyle(color: tokens.textSecondary),
     filled: true,
-    fillColor: Colors.white.withValues(alpha: 0.08),
+    fillColor: tokens.cardBackground.withValues(alpha: 0.45),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(9),
       borderSide: BorderSide.none,

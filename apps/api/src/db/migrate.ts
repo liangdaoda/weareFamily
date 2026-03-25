@@ -127,6 +127,34 @@ async function ensurePolicyColumns(): Promise<void> {
       table.text('ai_payload').nullable();
     });
   }
+
+  const hasRenewalStatus = await db.schema.hasColumn('policies', 'renewal_status');
+  if (!hasRenewalStatus) {
+    await db.schema.alterTable('policies', (table) => {
+      table.string('renewal_status', 24).notNullable().defaultTo('not_due').index();
+    });
+  }
+
+  const hasAssigneeUserId = await db.schema.hasColumn('policies', 'assignee_user_id');
+  if (!hasAssigneeUserId) {
+    await db.schema.alterTable('policies', (table) => {
+      table.string('assignee_user_id', 36).nullable().index();
+    });
+  }
+
+  const hasLifecycleNote = await db.schema.hasColumn('policies', 'lifecycle_note');
+  if (!hasLifecycleNote) {
+    await db.schema.alterTable('policies', (table) => {
+      table.text('lifecycle_note').nullable();
+    });
+  }
+
+  const hasLifecycleUpdatedAt = await db.schema.hasColumn('policies', 'lifecycle_updated_at');
+  if (!hasLifecycleUpdatedAt) {
+    await db.schema.alterTable('policies', (table) => {
+      table.timestamp('lifecycle_updated_at').nullable();
+    });
+  }
 }
 
 // Family member table for household profiles.
@@ -167,7 +195,121 @@ async function createPolicyDocumentsTable(): Promise<void> {
     table.bigInteger('file_size').notNullable().defaultTo(0);
     table.string('doc_type', 40).notNullable().defaultTo('policy-form');
     table.string('uploaded_by_user_id', 36).notNullable().index();
+    table.string('review_status', 24).notNullable().defaultTo('pending').index();
+    table.text('review_notes').nullable();
+    table.string('reviewed_by_user_id', 36).nullable().index();
+    table.timestamp('reviewed_at').nullable();
     table.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  });
+}
+
+// Ensure document review columns exist for operational review workflows.
+async function ensurePolicyDocumentColumns(): Promise<void> {
+  const exists = await db.schema.hasTable('policy_documents');
+  if (!exists) {
+    return;
+  }
+
+  const hasReviewStatus = await db.schema.hasColumn('policy_documents', 'review_status');
+  if (!hasReviewStatus) {
+    await db.schema.alterTable('policy_documents', (table) => {
+      table.string('review_status', 24).notNullable().defaultTo('pending').index();
+    });
+  }
+
+  const hasReviewNotes = await db.schema.hasColumn('policy_documents', 'review_notes');
+  if (!hasReviewNotes) {
+    await db.schema.alterTable('policy_documents', (table) => {
+      table.text('review_notes').nullable();
+    });
+  }
+
+  const hasReviewedByUserId = await db.schema.hasColumn('policy_documents', 'reviewed_by_user_id');
+  if (!hasReviewedByUserId) {
+    await db.schema.alterTable('policy_documents', (table) => {
+      table.string('reviewed_by_user_id', 36).nullable().index();
+    });
+  }
+
+  const hasReviewedAt = await db.schema.hasColumn('policy_documents', 'reviewed_at');
+  if (!hasReviewedAt) {
+    await db.schema.alterTable('policy_documents', (table) => {
+      table.timestamp('reviewed_at').nullable();
+    });
+  }
+}
+
+// Snapshot table for external income benchmark updates with local fallback.
+async function createIncomeBenchmarkSnapshotsTable(): Promise<void> {
+  const exists = await db.schema.hasTable('income_benchmark_snapshots');
+  if (exists) {
+    return;
+  }
+
+  await db.schema.createTable('income_benchmark_snapshots', (table) => {
+    table.string('id', 36).primary();
+    table.string('source', 80).notNullable();
+    table.string('region', 32).notNullable().index();
+    table.string('currency', 8).notNullable().defaultTo('CNY');
+    table.string('period', 24).notNullable().defaultTo('annual');
+    table.decimal('annual_income', 14, 2).notNullable();
+    table.timestamp('published_at').nullable();
+    table.timestamp('effective_date').nullable();
+    table.timestamp('fetched_at').notNullable().defaultTo(db.fn.now()).index();
+    table.text('payload').nullable();
+    table.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  });
+}
+
+// Persist value-analysis outputs to support explainability and ops decisions.
+async function createPolicyValueAnalysesTable(): Promise<void> {
+  const exists = await db.schema.hasTable('policy_value_analyses');
+  if (exists) {
+    return;
+  }
+
+  await db.schema.createTable('policy_value_analyses', (table) => {
+    table.string('id', 36).primary();
+    table.string('tenant_id', 36).notNullable().index();
+    table.string('family_id', 36).notNullable().index();
+    table.string('policy_id', 36).notNullable().index();
+    table.decimal('value_score', 5, 2).notNullable();
+    table.decimal('value_confidence', 5, 2).notNullable();
+    table.text('dimensions').notNullable();
+    table.text('reasons').nullable();
+    table.text('recommendations').nullable();
+    table.text('summary').nullable();
+    table.string('scoring_version', 40).notNullable().defaultTo('v1');
+    table.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+    table.timestamp('updated_at').notNullable().defaultTo(db.fn.now()).index();
+  });
+}
+
+// Operational task table for renewal, review, and data quality queues.
+async function createOpsTasksTable(): Promise<void> {
+  const exists = await db.schema.hasTable('ops_tasks');
+  if (exists) {
+    return;
+  }
+
+  await db.schema.createTable('ops_tasks', (table) => {
+    table.string('id', 36).primary();
+    table.string('tenant_id', 36).notNullable().index();
+    table.string('family_id', 36).notNullable().index();
+    table.string('policy_id', 36).nullable().index();
+    table.string('document_id', 36).nullable().index();
+    table.string('task_type', 40).notNullable().index();
+    table.string('status', 24).notNullable().defaultTo('open').index();
+    table.string('priority', 16).notNullable().defaultTo('medium').index();
+    table.string('title', 180).notNullable();
+    table.text('description').nullable();
+    table.text('payload').nullable();
+    table.string('assigned_user_id', 36).nullable().index();
+    table.string('created_by_user_id', 36).notNullable().index();
+    table.timestamp('due_at').nullable().index();
+    table.timestamp('closed_at').nullable();
+    table.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+    table.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
   });
 }
 
@@ -221,48 +363,46 @@ async function seedDemoData(): Promise<void> {
   const existingPolicies = await db('policies').where('tenant_id', tenantId).count<{ count: number }[]>('* as count');
   const total = Number(existingPolicies[0]?.count ?? 0);
 
-  if (total > 0) {
-    return;
+  if (total === 0) {
+    await db('policies').insert([
+      {
+        id: randomUUID(),
+        tenant_id: tenantId,
+        family_id: familyId,
+        policy_no: 'PA-2026-0001',
+        insurer_name: 'Ping An',
+        product_name: 'Family Accident Protection',
+        premium: 1560,
+        currency: 'CNY',
+        status: 'active',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
+        ai_risk_score: 14.5,
+        ai_notes: 'Coverage is strong; consider critical illness add-ons.',
+        created_by_user_id: brokerId,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: randomUUID(),
+        tenant_id: tenantId,
+        family_id: familyId,
+        policy_no: 'CPIC-2026-0009',
+        insurer_name: 'CPIC',
+        product_name: 'Critical Illness Plan',
+        premium: 4890,
+        currency: 'CNY',
+        status: 'active',
+        start_date: '2026-02-01',
+        end_date: '2027-01-31',
+        ai_risk_score: 36.2,
+        ai_notes: 'Premium ratio is acceptable; watch waiting period terms.',
+        created_by_user_id: consumerId,
+        created_at: now,
+        updated_at: now,
+      },
+    ]);
   }
-
-  await db('policies').insert([
-    {
-      id: randomUUID(),
-      tenant_id: tenantId,
-      family_id: familyId,
-      policy_no: 'PA-2026-0001',
-      insurer_name: 'Ping An',
-      product_name: 'Family Accident Protection',
-      premium: 1560,
-      currency: 'CNY',
-      status: 'active',
-      start_date: '2026-01-01',
-      end_date: '2026-12-31',
-      ai_risk_score: 14.5,
-      ai_notes: 'Coverage is strong; consider critical illness add-ons.',
-      created_by_user_id: brokerId,
-      created_at: now,
-      updated_at: now,
-    },
-    {
-      id: randomUUID(),
-      tenant_id: tenantId,
-      family_id: familyId,
-      policy_no: 'CPIC-2026-0009',
-      insurer_name: 'CPIC',
-      product_name: 'Critical Illness Plan',
-      premium: 4890,
-      currency: 'CNY',
-      status: 'active',
-      start_date: '2026-02-01',
-      end_date: '2027-01-31',
-      ai_risk_score: 36.2,
-      ai_notes: 'Premium ratio is acceptable; watch waiting period terms.',
-      created_by_user_id: consumerId,
-      created_at: now,
-      updated_at: now,
-    },
-  ]);
 
   const existingMembers = await db('family_members')
     .where('tenant_id', tenantId)
@@ -294,6 +434,27 @@ async function seedDemoData(): Promise<void> {
       },
     ]);
   }
+
+  const existingBenchmarks = await db('income_benchmark_snapshots')
+    .where('region', env.benchmarkRegion)
+    .where('currency', env.benchmarkCurrency)
+    .count<{ count: number }[]>('* as count');
+  const benchmarkTotal = Number(existingBenchmarks[0]?.count ?? 0);
+  if (benchmarkTotal === 0) {
+    await db('income_benchmark_snapshots').insert({
+      id: randomUUID(),
+      source: env.benchmarkSource,
+      region: env.benchmarkRegion,
+      currency: env.benchmarkCurrency,
+      period: 'annual',
+      annual_income: env.benchmarkDefaultAnnualIncome,
+      published_at: now,
+      effective_date: now,
+      fetched_at: now,
+      payload: null,
+      created_at: now,
+    });
+  }
 }
 
 // Run all schema steps in sequence.
@@ -306,6 +467,10 @@ export async function runMigrations(): Promise<void> {
   await ensurePolicyColumns();
   await createFamilyMembersTable();
   await createPolicyDocumentsTable();
+  await ensurePolicyDocumentColumns();
+  await createIncomeBenchmarkSnapshotsTable();
+  await createPolicyValueAnalysesTable();
+  await createOpsTasksTable();
   await seedDemoData();
 }
 

@@ -6,6 +6,7 @@ import 'package:wearefamily_app/core/api/api_client.dart';
 import 'package:wearefamily_app/core/api/user_profile.dart';
 import 'package:wearefamily_app/core/i18n/locale_text.dart';
 import 'package:wearefamily_app/core/theme/app_spacing.dart';
+import 'package:wearefamily_app/core/theme/app_visual_tokens.dart';
 import 'package:wearefamily_app/features/policies/presentation/screens/policy_create_screen.dart';
 import 'package:wearefamily_app/features/policies/presentation/screens/policy_detail_screen.dart';
 import 'package:wearefamily_app/features/policies/presentation/widgets/policy_card.dart';
@@ -32,19 +33,21 @@ class PoliciesScreen extends StatefulWidget {
 class _PoliciesScreenState extends State<PoliciesScreen> {
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     final content = FutureBuilder<List<Policy>>(
       future: widget.apiClient.fetchPolicies(widget.profile),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CircularProgressIndicator(color: Colors.white));
+          return Center(
+            child: CircularProgressIndicator(color: tokens.accent),
+          );
         }
 
         if (snapshot.hasError) {
           return Center(
             child: Text(
               '${context.tr('加载失败', 'Load failed')}: ${snapshot.error}',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: tokens.textSecondary),
             ),
           );
         }
@@ -64,7 +67,7 @@ class _PoliciesScreenState extends State<PoliciesScreen> {
               widget.filter.type == PolicyFilterType.all
                   ? context.tr('暂无保单', 'No policies yet')
                   : context.tr('暂无符合条件的保单', 'No matching policies'),
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: tokens.textSecondary),
             ),
           );
         }
@@ -130,10 +133,12 @@ class _PoliciesScreenState extends State<PoliciesScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(widget.filter.title(context),
-            style: const TextStyle(color: Colors.white)),
+        foregroundColor: tokens.textPrimary,
+        iconTheme: IconThemeData(color: tokens.textPrimary),
+        title: Text(
+          widget.filter.title(context),
+          style: TextStyle(color: tokens.textPrimary),
+        ),
         actions: [
           IconButton(
             onPressed: _openPolicyCreate,
@@ -320,13 +325,14 @@ class _CreatePolicyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return ElevatedButton.icon(
       onPressed: onPressed,
       icon: const Icon(CupertinoIcons.add, size: 18),
       label: Text(context.tr('新建保单', 'Create policy')),
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.white.withValues(alpha: 0.16),
-        foregroundColor: Colors.white,
+        backgroundColor: tokens.accentSoftBg,
+        foregroundColor: tokens.textPrimary,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
       ),
@@ -347,20 +353,21 @@ class _ExpiringReminderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     final locale = Localizations.localeOf(context).languageCode.toLowerCase();
     final isChinese = locale.startsWith('zh');
 
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(9),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFC46A), Color(0xFFFF8A65)],
+        gradient: LinearGradient(
+          colors: [tokens.warning, tokens.danger],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x66FF8A65),
+            color: tokens.danger.withValues(alpha: 0.4),
             blurRadius: 24,
             offset: Offset(0, 12),
           ),
@@ -373,13 +380,13 @@ class _ExpiringReminderCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(CupertinoIcons.bell_fill, color: Colors.white),
+                Icon(CupertinoIcons.bell_fill, color: tokens.textPrimary),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     context.tr('即将到期提醒', 'Expiry reminder'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
+                          color: tokens.textPrimary,
                           fontWeight: FontWeight.w700,
                         ),
                   ),
@@ -392,7 +399,7 @@ class _ExpiringReminderCard extends StatelessWidget {
                   ? '30天内有 $totalCount 份保单即将到期，请尽快处理续保。'
                   : '$totalCount policies will expire within 30 days. Please prepare renewals.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.92),
+                    color: tokens.textPrimary.withValues(alpha: 0.92),
                   ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -411,7 +418,7 @@ class _ExpiringReminderCard extends StatelessWidget {
                     ? '还有 ${totalCount - policies.length} 份保单到期提醒，点击上方保单可查看详情。'
                     : '${totalCount - policies.length} more policies are nearing expiry.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: tokens.textSecondary.withValues(alpha: 0.9),
                     ),
               ),
           ],
@@ -432,8 +439,9 @@ class _ExpiringPolicyTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.visualTokens;
     return Material(
-      color: Colors.white.withValues(alpha: 0.16),
+      color: tokens.accentSoftBg,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -442,8 +450,8 @@ class _ExpiringPolicyTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              const Icon(CupertinoIcons.time_solid,
-                  color: Colors.white, size: 18),
+              Icon(CupertinoIcons.time_solid,
+                  color: tokens.textPrimary, size: 18),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
@@ -456,7 +464,7 @@ class _ExpiringPolicyTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
+                            color: tokens.textPrimary,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -464,7 +472,7 @@ class _ExpiringPolicyTile extends StatelessWidget {
                     Text(
                       _expiryDateText(context, policy),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: tokens.textSecondary.withValues(alpha: 0.9),
                           ),
                     ),
                   ],
@@ -474,13 +482,13 @@ class _ExpiringPolicyTile extends StatelessWidget {
               Text(
                 _daysLeftText(context, policy),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white,
+                      color: tokens.textPrimary,
                       fontWeight: FontWeight.w700,
                     ),
               ),
               const SizedBox(width: 2),
-              const Icon(CupertinoIcons.chevron_right,
-                  color: Colors.white70, size: 18),
+              Icon(CupertinoIcons.chevron_right,
+                  color: tokens.textSecondary, size: 18),
             ],
           ),
         ),

@@ -8,9 +8,4 @@ script = ""
 [[actions]]
 name = "运行"
 icon = "run"
-command = "flutter run"
-
-[[actions]]
-name = "运行"
-icon = "tool"
-command = "npm run stack:up"
+command = "npm run dev:full"

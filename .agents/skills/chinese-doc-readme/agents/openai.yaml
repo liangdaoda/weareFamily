@@ -1,0 +1,3 @@
+interface:
+  display_name: "中文文档与README"
+  short_description: "统一使用中文编写代码文档和README"
